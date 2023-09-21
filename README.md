@@ -93,7 +93,7 @@ Here is a playbook example to use `arista.avd.eos_designs_to_containerlab`:
 
 ```
 
-Here is how to define the containerlab host in the inventory file (the name "CONTAINERLAB" must not be changed)
+Here is an example how to define two containerlab hosts in the inventory file (the name "CONTAINERLAB" must not be changed)
 
 ```yaml
 ---
@@ -115,6 +115,8 @@ all:
           containerlab_labname: MyLabName
           containerlab_mgmt_network: 11.11.11.0/24
           containerlab_custom_interface_mapping: false                  # should be set to false if you are running a cEOS-lab < 4.28.0F
+          containerlab_prefix: '""'
+          containerlab_onboard_to_cvp_token: "eyJhbGciOiJSU..."         # you can provide a onboarding token from the CVP defined in the AVD eos_designs so that your virtual devices can directly onboard to this CVP
 ```
 
 ## License
