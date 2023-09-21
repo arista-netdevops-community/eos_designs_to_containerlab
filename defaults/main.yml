@@ -1,0 +1,44 @@
+---
+# defaults file for avd_to_containerlab
+
+# Root directory where to build output structure
+root_dir: '{{ inventory_dir }}'
+
+# AVD configurations output
+# Main output directory
+output_dir_name: 'intended'
+output_dir: '{{ root_dir }}/{{ output_dir_name }}'
+
+# Output for structured YAML files:
+structured_dir_name: 'structured_configs'
+structured_dir: '{{ output_dir }}/{{ structured_dir_name }}'
+
+# EOS Configuration Directory name
+eos_config_dir_name: 'configs'
+eos_config_dir: '{{ output_dir }}/{{ eos_config_dir_name }}'
+
+# Default containerlabs configuration file generated
+containerlab_container_data_path: '/data'
+containerlab_container_config_path: '{{ containerlab_container_data_path }}/configs'
+
+# Defaults for running containerlab
+containerlab_dir_name: 'containerlab'
+containerlab_dir: '{{ output_dir }}/{{ containerlab_dir_name }}'
+containerlab_mapping_dir_name: 'mappings'
+containerlab_mapping_dir: '{{ output_dir }}/{{ containerlab_dir_name }}/{{ containerlab_mapping_dir_name }}'
+containerlab_config_dir_name: 'configs'
+containerlab_config_dir: '{{ output_dir }}/{{ containerlab_dir_name }}/{{ containerlab_config_dir_name }}'
+containerlab_configuration: containerlab.yml
+containerlab_mode: installed
+containerlab_labname: AVD
+containerlab_prefix: __lab-name  
+containerlab_mgmt_network_name: MGMT
+containerlab_ceos_version: ceos:latest
+containerlab_vxlan_base: 100
+containerlab_enforce_startup_config: true
+containerlab_custom_interface_mapping: false
+containerlab_include_intfs_to_non_avd_nodes: false
+containerlab_deploy_on_hosts: true
+containerlab_client_ip_pool: []
+avd_structured_config_file_format: "yml"
+containerlab_deploy_startup_batches: 20

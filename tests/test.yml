@@ -1,0 +1,19 @@
+---
+
+- name: Create avd nodes specific files
+  hosts: DC1
+  gather_facts: false
+  tasks:
+    - name: 'Create avd nodes specific files'
+      import_role:
+        name: arista.avd.eos_designs_to_containerlab
+        tasks_from: create_avd_node_files
+
+- name: Create and deploy containerlab topology 
+  hosts: CONTAINERLAB
+  gather_facts: false
+  tasks:
+    - name: 'Create and deploy containerlab topology'
+      import_role:
+        name: arista.avd.eos_designs_to_containerlab
+        tasks_from: deploy

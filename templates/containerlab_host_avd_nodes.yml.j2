@@ -1,0 +1,34 @@
+{# CONTAINERLABS connections per containerlab host #}
+{# Run through all node names and divide them to the containerlab hosts #}
+{%- set distributed_nodes = {} -%}
+{%- set ns = namespace(include_non_avd_nodes = containerlab_include_non_avd_nodes) -%} 
+{%- for docker_node in groups['CONTAINERLAB'] -%}
+{%-     if loop.first -%}
+{%-         set ns.include_non_avd_nodes = hostvars[docker_node]['containerlab_include_non_avd_nodes'] -%}
+{%-     endif -%} 
+{%-     set docker_host_counter = loop -%}
+{%-     set tmp_node_list = [] -%}
+{%-     for fabric_switch in avd_nodes_all.nodes | arista.avd.natural_sort -%}
+{%-         if loop.index % (groups['CONTAINERLAB'] | length) == docker_host_counter.index-1 -%}
+{%-             do tmp_node_list.append(fabric_switch) -%}
+{%-         endif -%} 
+{%-       if ns.include_non_avd_nodes -%}
+{%-         if hostvars[fabric_switch].ethernet_interfaces is arista.avd.defined -%}
+{%-           set parentloop = loop -%}
+{%-           set fabric_switch_facts = hostvars[fabric_switch] | arista.avd.default -%}
+{%-           for link in fabric_switch_facts.ethernet_interfaces | arista.avd.natural_sort -%}
+{%-             if link.peer is arista.avd.defined and link.peer_interface is arista.avd.defined %}
+{#                LINKS to endpoints #}
+{%-               if link.peer not in ansible_play_hosts_all -%}
+{%-                 if link.peer not in tmp_node_list -%}
+{%-                   do tmp_node_list.append(link.peer) -%}
+{%-                 endif -%}
+{%-               endif -%}
+{%-             endif -%}  
+{%-           endfor -%}  
+{%-         endif -%}  
+{%-       endif -%} 
+{%-     endfor -%}  
+{%-     do distributed_nodes.update({ docker_node:tmp_node_list }) -%}
+{%- endfor -%}  
+{{ distributed_nodes | to_nice_yaml }}

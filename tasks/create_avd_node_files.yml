@@ -1,0 +1,55 @@
+---
+#tasks file for avd nodes
+
+- name: Remove local containerlab output directories
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ containerlab_config_dir }}"
+    - "{{ containerlab_mapping_dir }}"
+    - "{{ containerlab_dir }}"
+  delegate_to: localhost
+  run_once: true
+
+- name: Create local containerlab output directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: 0775
+  loop:
+    - "{{ containerlab_dir }}"
+    - "{{ containerlab_mapping_dir }}"
+  delegate_to: localhost
+  run_once: true
+
+- name: Include device intended structure configuration variables
+  delegate_to: localhost
+  include_vars: 
+    file: "{{ filename }}"
+  # errors='ignore' is needed for compatibility with ansible-core < 2.12
+  when: structured_config is not defined and lookup('first_found', filename, skip=True, errors='ignore')
+  vars:
+    filename: "{{ structured_dir }}/{{ inventory_hostname }}.{{ avd_structured_config_file_format }}"
+
+- name: Generate temporary connections per containerlab host
+  delegate_to: localhost
+  template:
+    src: containerlab_host_connections.yml.j2
+    dest: "{{ containerlab_dir }}/containerlab_host_connections.yml"
+  run_once: true
+
+- name: Generate custom interface mapping files
+  delegate_to: localhost
+  template:
+    src: containerlab_custom_intf_mapping.j2
+    dest: "{{ containerlab_mapping_dir }}/{{ inventory_hostname }}.json"
+  when: containerlab_custom_interface_mapping
+
+- name: Write the AVD inventory hosts to file for later use
+  yaml_templates_to_facts:
+    templates: 
+      - template: containerlab_play_hosts.yml.j2
+    dest: "{{ containerlab_dir }}/temp_AVD_ansible_hosts.yml"
+  delegate_to: localhost
+  run_once: true
