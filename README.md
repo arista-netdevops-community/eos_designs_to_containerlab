@@ -13,6 +13,9 @@
 - NOTE: If you are running a cEOS-lab < 4.28.0F set "containerlab_custom_interface_mapping: false".
 - NOTE: Currently you should only run one AVD lab on the containerlab host / containerlab hosts
 
+## Installation
+Clone this project and move the folder to the AVD roles in collections/ansible_collections/arista/avd/roles/. This is the same folder where the other AVD roles like eos_designs are.
+
 ## Role Variables
 
 The following default variables are defined, and can be modified as desired:
