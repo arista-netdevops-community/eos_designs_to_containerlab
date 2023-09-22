@@ -114,6 +114,9 @@ all:
           ansible_user: user
           ansible_password: password
           ansible_become_password: password
+          ansible_connection: ssh
+          ansible_become: true
+          ansible_become_method: sudo
           containerlab_ceos_version: ceos:4.28.0F
           containerlab_configuration: custom_topology.yml
           containerlab_vxlan_base: 200
