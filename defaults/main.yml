@@ -42,3 +42,4 @@ containerlab_deploy_on_hosts: true
 containerlab_client_ip_pool: []
 avd_structured_config_file_format: "yml"
 containerlab_deploy_startup_batches: 20
+containerlab_include_non_avd_nodes: false

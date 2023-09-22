@@ -14,6 +14,7 @@
 - NOTE: Currently you should only run one AVD lab on the containerlab host / containerlab hosts
 
 ## Installation
+
 Clone this project and move the folder to the AVD roles in collections/ansible_collections/arista/avd/roles/. This is the same folder where the other AVD roles like eos_designs are.
 
 ## Role Variables
@@ -41,6 +42,7 @@ The following default variables are defined, and can be modified as desired:
 - `containerlab_onboard_to_cvp_token:` Optional parameter to provide a CVP token to devices for registering with CVP automatically.
 - `containerlab_deploy_on_hosts:` Copy the topology file and other needed files to the containerlab hosts and run the lab. If set to false the topology files and other needed files will only be created in the intended/ folder. (default: true)
 - `containerlab_deploy_startup_batches:` Depending on your containerlab host resources you might want to limit the amount of containers started in parallel. This option uses the containerlab option startup-delay and the delay is set to 300 seconds between the batches. (default: 20)
+- `containerlab_include_non_avd_nodes`: With this parameter you can define if notes not defined in AVD inventory should be included in the containerlab topology, for example avd endpoints. (default: false)
 
 The above mentioned variables can be defined in the inventory file as shown below in the example playbook section.
 
