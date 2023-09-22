@@ -44,7 +44,7 @@
   template:
     src: containerlab_custom_intf_mapping.j2
     dest: "{{ containerlab_mapping_dir }}/{{ inventory_hostname }}.json"
-  when: containerlab_custom_interface_mapping
+  #when: containerlab_custom_interface_mapping
 
 - name: Write the AVD inventory hosts to file for later use
   yaml_templates_to_facts:
