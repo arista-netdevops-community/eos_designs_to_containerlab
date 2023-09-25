@@ -32,6 +32,13 @@
   vars:
     filename: "{{ structured_dir }}/{{ inventory_hostname }}.{{ avd_structured_config_file_format }}"
 
+- name: Include inventory vars
+  delegate_to: localhost
+  run_once: true
+  include_vars:
+    file: "{{ inventory_file }}"
+    name: inventory_vars
+
 - name: Generate temporary connections per containerlab host
   delegate_to: localhost
   template:
@@ -44,7 +51,7 @@
   template:
     src: containerlab_custom_intf_mapping.j2
     dest: "{{ containerlab_mapping_dir }}/{{ inventory_hostname }}.json"
-  #when: containerlab_custom_interface_mapping
+  when: inventory_vars["all"]["children"]["CONTAINERLAB"]["vars"]["containerlab_custom_interface_mapping"] is defined and inventory_vars["all"]["children"]["CONTAINERLAB"]["vars"]["containerlab_custom_interface_mapping"]
 
 - name: Write the AVD inventory hosts to file for later use
   yaml_templates_to_facts:

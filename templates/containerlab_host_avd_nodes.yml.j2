@@ -1,10 +1,10 @@
 {# CONTAINERLABS connections per containerlab host #}
 {# Run through all node names and divide them to the containerlab hosts #}
 {%- set distributed_nodes = {} -%}
-{%- set ns = namespace(include_non_avd_nodes = containerlab_include_non_avd_nodes) -%} 
+{%- set ns = namespace(include_non_avd_nodes = false) -%} 
 {%- for docker_node in groups['CONTAINERLAB'] -%}
 {%-     if loop.first -%}
-{%-         set ns.include_non_avd_nodes = hostvars[docker_node]['containerlab_include_non_avd_nodes'] -%}
+{%-         set ns.include_non_avd_nodes = inventory_vars["all"]["children"]["CONTAINERLAB"]["vars"]["containerlab_include_non_avd_nodes"] | default('false') | bool -%}
 {%-     endif -%} 
 {%-     set docker_host_counter = loop -%}
 {%-     set tmp_node_list = [] -%}

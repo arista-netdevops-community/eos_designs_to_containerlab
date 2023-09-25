@@ -1,9 +1,9 @@
 
 {%- set tmp_node_list = [] -%}
-{%- set ns3 = namespace(include_non_avd_nodes = containerlab_include_non_avd_nodes) -%} 
+{%- set ns3 = namespace(include_non_avd_nodes = false) -%} 
 {%- for docker_node in groups['CONTAINERLAB'] -%}
 {%-     if loop.first -%}
-{%-         set ns3.include_non_avd_nodes = hostvars[docker_node]['containerlab_include_non_avd_nodes'] -%}
+{%-         set ns3.include_non_avd_nodes = inventory_vars["all"]["children"]["CONTAINERLAB"]["vars"]["containerlab_include_non_avd_nodes"] | default('false') | bool -%}
 {%-     endif -%} 
 {%- endfor -%}  
 {%-     if ns3.include_non_avd_nodes -%}
