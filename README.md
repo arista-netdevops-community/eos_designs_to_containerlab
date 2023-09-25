@@ -31,7 +31,7 @@ The following default variables are defined, and can be modified as desired:
 - `containerlab_mgmt_network`: Address range for the management network. Currently containerlab supports one management network. (if not set it will be tried to find the network range based on the first node which is processed.)
 - `containerlab_ceos_version`: Name of the cEOS-lab docker image to be used. (default: ceos:latest)
 - `containerlab_enforce_startup_config`: Enforce to reset the startup-config for every run, see: https://containerlab.dev/manual/nodes/#enforce-startup-config . (default: true)
-- `containerlab_custom_interface_mapping`: Should a custom interface mapping be created based on the AVD defined interfaces, this option also changes the management interface to what is defined for the nodes in eos_designs. Supported in cEOS-lab 4.28.0F and later. (default: true)
+- `containerlab_custom_interface_mapping`: Should a custom interface mapping be created based on the AVD defined interfaces, this option also changes the management interface to what is defined for the nodes in eos_designs. Supported in cEOS-lab 4.28.0F and later. Should be set to true if Management 1 is used as management interface. (default: false)
 - `containerlab_include_intfs_to_non_avd_nodes`: Include dummy interfaces for connections to non AVD defined notes. (default: false)
 - `containerlab_debug`: Turn on debug output for the containerlab deploy command. (default: false)
 - `containerlab_mode`: Deploy the topology using an installed or containerized containerlab. (default: installed ; options: installed | container)
@@ -42,7 +42,6 @@ The following default variables are defined, and can be modified as desired:
 - `containerlab_onboard_to_cvp_token:` Optional parameter to provide a CVP token to devices for registering with CVP automatically.
 - `containerlab_deploy_on_hosts:` Copy the topology file and other needed files to the containerlab hosts and run the lab. If set to false the topology files and other needed files will only be created in the intended/ folder. (default: true)
 - `containerlab_deploy_startup_batches:` Depending on your containerlab host resources you might want to limit the amount of containers started in parallel. This option uses the containerlab option startup-delay and the delay is set to 300 seconds between the batches. (default: 20)
-- `containerlab_include_non_avd_nodes`: With this parameter you can define if notes not defined in AVD inventory should be included in the containerlab topology, for example avd endpoints. (default: false)
 
 The above mentioned variables can be defined in the inventory file as shown below in the example playbook section.
 
