@@ -1,0 +1,15 @@
+---
+name: $containerlab_labname
+
+prefix: $containerlab_prefix
+
+mgmt:
+  network: $containerlab_mgmt_network_name
+  ipv4-subnet: $containerlab_mgmt_network
+topology:
+  nodes:
+$nodes
+
+  links:
+$links
+    

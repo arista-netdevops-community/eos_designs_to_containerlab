@@ -1,0 +1,4 @@
+{# CONTAINERLABS clab vxlan commands #}
+#!/bin/bash
+
+$delete_clab_tools_connection

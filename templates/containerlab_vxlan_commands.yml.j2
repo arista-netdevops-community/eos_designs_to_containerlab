@@ -1,6 +1,0 @@
-{# CONTAINERLABS clab vxlan commands #}
-#!/bin/bash
-
-{% for connection in connections_per_host[inventory_hostname]['local_vx_clab_tools_cmd'] %}
-{{ connection }}
-{% endfor %}

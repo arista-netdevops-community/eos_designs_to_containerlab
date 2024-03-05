@@ -1,0 +1,4 @@
+{# CONTAINERLABS clab vxlan commands #}
+#!/bin/bash
+
+$connection
