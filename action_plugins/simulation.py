@@ -228,54 +228,58 @@ class ActionModule(ActionBase):
                 intf_counter = 1
                 switch_intf_mapping_dict[switch] = {}
                 for eth in hostvars[switch]["ethernet_interfaces"]:
-                    # create EOS interface to linux eth mapping if needed
-                    if containerlab_custom_interface_mapping:
-                        tmp_intf_mapping = {str((eth["name"].split("."))[0]):"eth"+str(intf_counter)}
-                        switch_intf_mapping_dict[switch].update(tmp_intf_mapping)
-                        intf_counter += 1
+                    
+                    # Ignore ethernet interfaces which don't have a peer_interface defined, this is for example when using eos_designs -> network_ports
+                    if "peer_interface" in eth:
+                        
+                        # create EOS interface to linux eth mapping if needed
+                        if containerlab_custom_interface_mapping:
+                            tmp_intf_mapping = {str((eth["name"].split("."))[0]):"eth"+str(intf_counter)}
+                            switch_intf_mapping_dict[switch].update(tmp_intf_mapping)
+                            intf_counter += 1
 
-                    # if sim_env is 'clab' replace 'Ethernet' with 'eth' and '/' with '_'      
-                    if sim_env == "clab" and not containerlab_custom_interface_mapping:
-                        loc_int = str((eth["name"].split("."))[0]).replace("Ethernet","eth").replace("/","_")
-                        peer_int = str((eth["peer_interface"].split("."))[0]).replace("Ethernet","eth").replace("/","_")
-                    else:
-                        loc_int = str((eth["name"].split("."))[0])
-                        peer_int = str((eth["peer_interface"].split("."))[0])
-
-                    connection = {"loc_switch":switch, "loc_int":loc_int, "peer_name":eth["peer"], "peer_int":peer_int}
-
-                    # Check if connection is not in the connections list already
-                    if not self.dedup_connection(avd_connections, connection):
-                        if eth["peer"] in inventory:
-                            # Connections between AVD defined nodes
-                            avd_connections.append(connection)            
+                        # if sim_env is 'clab' replace 'Ethernet' with 'eth' and '/' with '_'      
+                        if sim_env == "clab" and not containerlab_custom_interface_mapping:
+                            loc_int = str((eth["name"].split("."))[0]).replace("Ethernet","eth").replace("/","_")
+                            peer_int = str((eth["peer_interface"].split("."))[0]).replace("Ethernet","eth").replace("/","_")
                         else:
-                            # Connections to external nodes (ex. defined in connected endpoints)
-                            if sim_include_avd_external_nodes:
-                                if "peer_type" in eth:
-                                    peer_type = eth["peer_type"]
-                                else:
-                                    peer_type = "none"
-                                
-                                if sim_external_node_one_container:
-                                    # If there should be only one external node representing all external connection (today only ceos)
-                                    client_all_connection = {"loc_switch":switch, "loc_int":loc_int, "peer_name":"client_all", "peer_int":"eth"+str(client_all_intf_index)}
-                                    client_all_intf_index += 1
-                                    ext_connections.append(client_all_connection)
-                                else:
-                                    ext_connections.append(connection)
-                                
-                                # Add the external nodes to a set so that they can be distributed to the simulation hosts afterwards
-                                node_type = {"kind": "ceos", "image":sim_ceos_version}
-                                if peer_type in sim_external_nodes_map and not sim_external_node_one_container:
-                                    node_type = sim_external_nodes_map[peer_type]
-                                
-                                if sim_external_node_one_container and not client_all_added:
-                                    # If there should be only one external node representing all external connection (today only ceos)
-                                    ext_nodes.append({"client_all":node_type})
-                                    client_all_added = True
-                                elif not sim_external_node_one_container:
-                                    ext_nodes.append({eth["peer"]:node_type})
+                            loc_int = str((eth["name"].split("."))[0])
+                            peer_int = str((eth["peer_interface"].split("."))[0])
+
+                        connection = {"loc_switch":switch, "loc_int":loc_int, "peer_name":eth["peer"], "peer_int":peer_int}
+
+                        # Check if connection is not in the connections list already
+                        if not self.dedup_connection(avd_connections, connection):
+                            if eth["peer"] in inventory:
+                                # Connections between AVD defined nodes
+                                avd_connections.append(connection)            
+                            else:
+                                # Connections to external nodes (ex. defined in connected endpoints)
+                                if sim_include_avd_external_nodes:
+                                    if "peer_type" in eth:
+                                        peer_type = eth["peer_type"]
+                                    else:
+                                        peer_type = "none"
+                                    
+                                    if sim_external_node_one_container:
+                                        # If there should be only one external node representing all external connection (today only ceos)
+                                        client_all_connection = {"loc_switch":switch, "loc_int":loc_int, "peer_name":"client_all", "peer_int":"eth"+str(client_all_intf_index)}
+                                        client_all_intf_index += 1
+                                        ext_connections.append(client_all_connection)
+                                    else:
+                                        ext_connections.append(connection)
+                                    
+                                    # Add the external nodes to a set so that they can be distributed to the simulation hosts afterwards
+                                    node_type = {"kind": "ceos", "image":sim_ceos_version}
+                                    if peer_type in sim_external_nodes_map and not sim_external_node_one_container:
+                                        node_type = sim_external_nodes_map[peer_type]
+                                    
+                                    if sim_external_node_one_container and not client_all_added:
+                                        # If there should be only one external node representing all external connection (today only ceos)
+                                        ext_nodes.append({"client_all":node_type})
+                                        client_all_added = True
+                                    elif not sim_external_node_one_container:
+                                        ext_nodes.append({eth["peer"]:node_type})
         
         # Distribute the external nodes to the simulation hosts afterwards                        
         if sim_include_avd_external_nodes: 
