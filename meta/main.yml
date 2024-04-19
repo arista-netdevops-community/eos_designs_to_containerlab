@@ -1,3 +1,4 @@
+---
 galaxy_info:
   author: Arista Ansible Team <ansible@arista.com>
   description: Generate configuration for ContainerLab from arista.avd Structured Configuration

@@ -9,7 +9,7 @@
         name: arista.avd.eos_designs_to_containerlab
         tasks_from: create_avd_node_files
 
-- name: Create and deploy containerlab topology 
+- name: Create and deploy containerlab topology
   hosts: CONTAINERLAB
   gather_facts: false
   tasks:
