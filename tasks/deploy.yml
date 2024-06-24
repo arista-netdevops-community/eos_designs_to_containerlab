@@ -8,7 +8,7 @@
 
 - name: Check if more than one containerlab host is defined
   set_fact:
-    multinode: "{{ true if groups['SIMULATION'] | arista.avd.default([]) | length > 1 else false }}"
+    multinode: "{{ true if groups['SIMULATION'] | default([]) | length > 1 else false }}"
   run_once: true
   delegate_to: localhost
 
@@ -80,10 +80,10 @@
   set_fact:
     containerlab_cmd: "\
     --reconfigure \
-    {% if containerlab_max_workers is arista.avd.defined %} --max-workers {{ containerlab_max_workers }}{% endif %}\
-    {% if containerlab_timeout is arista.avd.defined %} --timeout {{ containerlab_timeout }}{% endif %}\
-    {% if containerlab_skip_post_deploy is arista.avd.defined %}{% if containerlab_skip_post_deploy %} --skip-post-deploy {% endif %}{% endif %}\
-    {% if containerlab_debug is arista.avd.defined %}{% if containerlab_debug %} -d {% endif %}{% endif %}"
+    {% if containerlab_max_workers is defined %} --max-workers {{ containerlab_max_workers }}{% endif %}\
+    {% if containerlab_timeout is defined %} --timeout {{ containerlab_timeout }}{% endif %}\
+    {% if containerlab_skip_post_deploy is defined %}{% if containerlab_skip_post_deploy %} --skip-post-deploy {% endif %}{% endif %}\
+    {% if containerlab_debug is defined %}{% if containerlab_debug %} -d {% endif %}{% endif %}"
   delegate_to: localhost
   run_once: true
   when: containerlab_deploy_on_hosts
