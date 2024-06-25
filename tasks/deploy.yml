@@ -1,5 +1,5 @@
 ---
-#tasks file for containerlab hosts
+# tasks file for containerlab hosts
 
 - name: Gather facts from the clab hosts
   ansible.builtin.setup:
@@ -18,7 +18,7 @@
   register: stat_result
 
 - name: Destroy the lab using containerlab in a container
-  become: yes
+  become: true
   command: "docker run \
     --rm \
     -it \
@@ -33,26 +33,26 @@
     ghcr.io/srl-labs/clab clab destroy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.yml --cleanup "
   when: containerlab_mode == 'container' and stat_result.stat.exists and containerlab_deploy_on_hosts
 
-- name: Destroy the lab using installed containerlab 
-  become: yes
+- name: Destroy the lab using installed containerlab
+  become: true
   command: "clab destroy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.yml --cleanup"
   args:
     chdir: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
   when: containerlab_mode == 'installed' and stat_result.stat.exists and containerlab_deploy_on_hosts
 
 - name: Delete vxlan interfaces which were used by the old lab
-  become: yes
+  become: true
   command: "bash {{ inventory_hostname }}_vxlan_interface_delete.sh"
   args:
     chdir: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
   when: multinode and containerlab_deploy_on_hosts
-  ignore_errors: yes
+  ignore_errors: true
 
-- name: Remove containerlab directory on the containerlab host 
+- name: Remove containerlab directory on the containerlab host
   file:
     path: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
     state: absent
-  become: yes
+  become: true
   when: containerlab_deploy_on_hosts
 
 - name: Create required directories on the containerlab host
@@ -69,12 +69,12 @@
   when: containerlab_deploy_on_hosts
 
 - name: Delete vxlan interfaces which will be used by the new lab
-  become: yes
+  become: true
   command: "bash {{ inventory_hostname }}_vxlan_interface_delete.sh"
   args:
     chdir: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
   when: multinode and containerlab_deploy_on_hosts
-  ignore_errors: yes
+  ignore_errors: true
 
 - name: Creating run parameters for containerlab deploy
   set_fact:
@@ -89,7 +89,7 @@
   when: containerlab_deploy_on_hosts
 
 - name: Deploy the lab using containerlab in a container
-  become: yes
+  become: true
   command: "docker run \
     --rm \
     -it \
@@ -105,7 +105,7 @@
   when: containerlab_mode == 'container' and containerlab_deploy_on_hosts
 
 - name: Run the containerlab vxlan commands (container clab)
-  become: yes
+  become: true
   command: "docker run \
     --rm \
     -it \
@@ -121,14 +121,14 @@
   when: multinode and containerlab_mode == 'container' and containerlab_deploy_on_hosts
 
 - name: Deploy the lab using installed containerlab
-  become: yes
+  become: true
   command: "clab deploy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.yml {{ containerlab_cmd }} "
   args:
     chdir: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
   when: containerlab_mode == 'installed' and containerlab_deploy_on_hosts
 
 - name: Run the containerlab vxlan commands (installed clab)
-  become: yes
+  become: true
   command: "bash {{ inventory_hostname }}_vxlan_commands.sh"
   args:
     chdir: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
