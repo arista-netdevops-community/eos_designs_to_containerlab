@@ -96,7 +96,10 @@ class ActionModule(ActionBase):
                     if "containerlab" in hostvars[node]:
                         containerlab_structured = yaml.dump(hostvars[node]["containerlab"], sort_keys=True, indent=6)
                         for line in containerlab_structured.splitlines():
-                            node_string += "      "+str(line)+"\n"
+                            if "bind:" in line:
+                                node_string +=  "        -"+str(line).replace("bind:","")+"\n"
+                            else:
+                                node_string += "      "+str(line)+"\n"
                             
                 elif node_hostvars_exist and kind in ["linux"]:
                     lines = str(hostvars[node]["clab_vars"]).splitlines()
