@@ -191,6 +191,10 @@ class ActionModule(ActionBase):
                 containerlab_dir = hostvars[first_sim_node]["containerlab_dir"]
             else:
                 containerlab_dir = inventory_dir + "/intended/containerlab/"
+            if "containerlab_add_mgmt_links" in hostvars[first_sim_node]:
+                containerlab_add_mgmt_links = hostvars[first_sim_node]["containerlab_add_mgmt_links"]
+            else:
+                containerlab_add_mgmt_links = []
             
         
         # If sim_env not clab only one simulation node is possible, ex. for ACT. The first node will be choosen
@@ -286,7 +290,13 @@ class ActionModule(ActionBase):
                                         client_all_added = True
                                     elif not sim_external_node_one_container:
                                         ext_nodes.append({eth["peer"]:node_type})
-        
+
+        # Additional containerlab mgmt connection defined in vars of SIMULATION Host                         
+        for element in containerlab_add_mgmt_links:
+            tmp_conn = {"loc_switch":element["node"], "loc_int":element["intf"], "peer_name":"mgmt-net", "peer_int":element["node"]+"-"+element["intf"]}
+            print (tmp_conn)
+            ext_connections.append(tmp_conn)
+
         # Distribute the external nodes to the simulation hosts afterwards                        
         if sim_include_avd_external_nodes: 
             for ext_node in self.unique(ext_nodes):
@@ -335,6 +345,10 @@ class ActionModule(ActionBase):
 
                         # Connections which stay local on the simulation host (both nodes on the same simulation host)
                         if connection["peer_name"] in distributed_nodes[sim_node]:
+                            sim_connections[sim_node]["local_con"].append(connection)
+
+                        # Additional containerlab mgmt connection defined in vars of SIMULATION Host
+                        elif connection["peer_name"] == "mgmt-net":
                             sim_connections[sim_node]["local_con"].append(connection)
                             
                         # Connections which are to a remote simulation node running on a different simulation host (written in local topology file)
