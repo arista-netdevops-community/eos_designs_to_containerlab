@@ -16,7 +16,7 @@
 
 ## Installation
 
-Clone this project to your directory where your AVD playbooks are. This is the same folder where the other AVD roles like eos_designs are.
+Clone this project to your directory where your AVD playbooks are.
 
 ## Role Variables
 
@@ -119,6 +119,8 @@ Here is a playbook example to use `arista.avd.eos_designs_to_containerlab`:
 ## Inventory
 
 Here is an example how to define two simulation hosts in the inventory file (the name "SIMULATION" must not be changed)
+
+NOTE: The group SIMULATION and the mandatory fields have to be defined.
 
 ```yaml
 ---
