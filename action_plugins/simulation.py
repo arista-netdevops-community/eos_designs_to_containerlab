@@ -94,12 +94,10 @@ class ActionModule(ActionBase):
                         node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/token:ro\n"
                     
                     if "containerlab" in hostvars[node]:
-                        containerlab_structured = yaml.dump(hostvars[node]["containerlab"], sort_keys=True, indent=6)
-                        for line in containerlab_structured.splitlines():
-                            if "bind:" in line:
-                                node_string +=  "        -"+str(line).replace("bind:","")+"\n"
-                            else:
-                                node_string += "      "+str(line)+"\n"
+                        if "bind" in hostvars[node]["containerlab"]:
+                            node_string +=  "        - "+str(hostvars[node]["containerlab"]["bind"])+"\n"
+                        else:
+                            node_string += "      "+str(hostvars[node]["containerlab"])+"\n"
                             
                 elif node_hostvars_exist and kind in ["linux"]:
                     lines = str(hostvars[node]["clab_vars"]).splitlines()
@@ -116,9 +114,9 @@ class ActionModule(ActionBase):
     def run(self, tmp=None, task_vars=None):
         super(ActionModule, self).run(tmp, task_vars)
         ret = dict()
-        inventory = self._task.args.get("inventory", {})
-        hostvars = self._task.args.get("hostvars", {})
-        groups = self._task.args.get("groups", {})
+        inventory = sorted(task_vars.get("ansible_play_hosts_all", {}))
+        hostvars = task_vars.get("hostvars", {})
+        groups = task_vars.get("groups", {})
 
         # Default variables
         sim_env = "clab"
