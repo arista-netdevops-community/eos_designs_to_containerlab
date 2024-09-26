@@ -116,9 +116,9 @@ class ActionModule(ActionBase):
     def run(self, tmp=None, task_vars=None):
         super(ActionModule, self).run(tmp, task_vars)
         ret = dict()
-        inventory = self._task.args.get("inventory", {})
-        hostvars = self._task.args.get("hostvars", {})
-        groups = self._task.args.get("groups", {})
+        inventory = sorted(task_vars.get("ansible_play_hosts_all", {}))
+        hostvars = task_vars.get("hostvars", {})
+        groups = task_vars.get("groups", {})
 
         # Default variables
         sim_env = "clab"
