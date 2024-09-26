@@ -94,12 +94,10 @@ class ActionModule(ActionBase):
                         node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/token:ro\n"
                     
                     if "containerlab" in hostvars[node]:
-                        containerlab_structured = yaml.dump(hostvars[node]["containerlab"], sort_keys=True, indent=6)
-                        for line in containerlab_structured.splitlines():
-                            if "bind:" in line:
-                                node_string +=  "        -"+str(line).replace("bind:","")+"\n"
-                            else:
-                                node_string += "      "+str(line)+"\n"
+                        if "bind" in hostvars[node]["containerlab"]:
+                            node_string +=  "        - "+str(hostvars[node]["containerlab"]["bind"])+"\n"
+                        else:
+                            node_string += "      "+str(hostvars[node]["containerlab"])+"\n"
                             
                 elif node_hostvars_exist and kind in ["linux"]:
                     lines = str(hostvars[node]["clab_vars"]).splitlines()
