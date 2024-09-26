@@ -23,6 +23,3 @@
   delegate_to: localhost
   run_once: true
   simulation:
-    inventory: "{{ ansible_play_hosts_all | sort() }}"
-    hostvars: "{{ hostvars }}"
-    groups: "{{ groups }}"
