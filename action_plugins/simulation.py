@@ -242,8 +242,9 @@ class ActionModule(ActionBase):
                     if "peer_interface" in eth:
 
                         # Ignore connections to switches which are not deployed
-                        if "is_deployed" in hostvars[eth["peer"]] and hostvars[eth["peer"]]["is_deployed"] == False:
-                            continue
+                        if eth["peer"] in hostvars:
+                            if "is_deployed" in hostvars[eth["peer"]] and hostvars[eth["peer"]]["is_deployed"] == False:
+                                continue
                         
                         # create EOS interface to linux eth mapping if needed
                         if containerlab_custom_interface_mapping:
