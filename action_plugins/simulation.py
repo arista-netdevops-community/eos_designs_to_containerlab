@@ -219,6 +219,10 @@ class ActionModule(ActionBase):
         
         for switch in inventory:
             
+            # Ignore switches which are not deployed
+            if "is_deployed" in hostvars[switch] and hostvars[switch]["is_deployed"] == False:
+                    continue
+
             # if there are more than 1 clab host defined, create a list on which host which switch will run on
             if host_count > 1:
                 position = host_distribute_counter % (host_count)
@@ -236,6 +240,10 @@ class ActionModule(ActionBase):
                     
                     # Ignore ethernet interfaces which don't have a peer_interface defined, this is for example when using eos_designs -> network_ports
                     if "peer_interface" in eth:
+
+                        # Ignore connections to switches which are not deployed
+                        if "is_deployed" in hostvars[eth["peer"]] and hostvars[eth["peer"]]["is_deployed"] == False:
+                            continue
                         
                         # create EOS interface to linux eth mapping if needed
                         if containerlab_custom_interface_mapping:
