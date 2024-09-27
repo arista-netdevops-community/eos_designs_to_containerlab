@@ -146,8 +146,8 @@ class ActionModule(ActionBase):
                 all_sim_nodes.append(first_sim_node)
 
         if first_sim_node:
-            inventory_dir = hostvars[first_sim_node]["inventory_dir"]
-            playbook_dir = hostvars[first_sim_node]["playbook_dir"]
+            inventory_dir = hostvars[first_sim_node].get("sim_inventory_dir_override", hostvars[first_sim_node]["inventory_dir"])
+            playbook_dir = hostvars[first_sim_node].get("sim_playbook_dir_override", hostvars[first_sim_node]["playbook_dir"])
             if "sim_env" in hostvars[first_sim_node]:
                 sim_env = hostvars[first_sim_node]["sim_env"]
             if "sim_include_avd_external_nodes" in hostvars[first_sim_node]:
