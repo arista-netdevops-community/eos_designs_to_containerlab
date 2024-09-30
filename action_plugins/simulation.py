@@ -94,12 +94,10 @@ class ActionModule(ActionBase):
                         node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/token:ro\n"
                     
                     if "containerlab" in hostvars[node]:
-                        containerlab_structured = yaml.dump(hostvars[node]["containerlab"], sort_keys=True, indent=6)
-                        for line in containerlab_structured.splitlines():
-                            if "bind:" in line:
-                                node_string +=  "        -"+str(line).replace("bind:","")+"\n"
-                            else:
-                                node_string += "      "+str(line)+"\n"
+                        if "bind" in hostvars[node]["containerlab"]:
+                            node_string +=  "        - "+str(hostvars[node]["containerlab"]["bind"])+"\n"
+                        else:
+                            node_string += "      "+str(hostvars[node]["containerlab"])+"\n"
                             
                 elif node_hostvars_exist and kind in ["linux"]:
                     lines = str(hostvars[node]["clab_vars"]).splitlines()
@@ -116,9 +114,9 @@ class ActionModule(ActionBase):
     def run(self, tmp=None, task_vars=None):
         super(ActionModule, self).run(tmp, task_vars)
         ret = dict()
-        inventory = self._task.args.get("inventory", {})
-        hostvars = self._task.args.get("hostvars", {})
-        groups = self._task.args.get("groups", {})
+        inventory = sorted(task_vars.get("ansible_play_hosts_all", {}))
+        hostvars = task_vars.get("hostvars", {})
+        groups = task_vars.get("groups", {})
 
         # Default variables
         sim_env = "clab"
@@ -148,8 +146,8 @@ class ActionModule(ActionBase):
                 all_sim_nodes.append(first_sim_node)
 
         if first_sim_node:
-            inventory_dir = hostvars[first_sim_node]["inventory_dir"]
-            playbook_dir = hostvars[first_sim_node]["playbook_dir"]
+            inventory_dir = hostvars[first_sim_node].get("sim_inventory_dir_override", hostvars[first_sim_node]["inventory_dir"])
+            playbook_dir = hostvars[first_sim_node].get("sim_playbook_dir_override", hostvars[first_sim_node]["playbook_dir"])
             if "sim_env" in hostvars[first_sim_node]:
                 sim_env = hostvars[first_sim_node]["sim_env"]
             if "sim_include_avd_external_nodes" in hostvars[first_sim_node]:
@@ -221,6 +219,10 @@ class ActionModule(ActionBase):
         
         for switch in inventory:
             
+            # Ignore switches which are not deployed
+            if "is_deployed" in hostvars[switch] and hostvars[switch]["is_deployed"] == False:
+                    continue
+
             # if there are more than 1 clab host defined, create a list on which host which switch will run on
             if host_count > 1:
                 position = host_distribute_counter % (host_count)
@@ -238,6 +240,11 @@ class ActionModule(ActionBase):
                     
                     # Ignore ethernet interfaces which don't have a peer_interface defined, this is for example when using eos_designs -> network_ports
                     if "peer_interface" in eth:
+
+                        # Ignore connections to switches which are not deployed
+                        if eth["peer"] in hostvars:
+                            if "is_deployed" in hostvars[eth["peer"]] and hostvars[eth["peer"]]["is_deployed"] == False:
+                                continue
                         
                         # create EOS interface to linux eth mapping if needed
                         if containerlab_custom_interface_mapping:
