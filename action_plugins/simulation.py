@@ -402,22 +402,7 @@ class ActionModule(ActionBase):
                 mapping_switch_all = {'ManagementIntf':ma_mapping_switch}
                 mapping_switch_all.update({'EthernetIntf':eth_mapping_switch})
                 mapping_switch_mapping_dict[switch] = mapping_switch_all
-                
-                # filename = containerlab_mapping_dir+switch+".json"
-                # os.makedirs(os.path.dirname(filename), exist_ok=True)
-                # with open(filename, 'w') as file:
-                #     json_string = json.dumps(mapping_switch_all, sort_keys=True, indent=4)
-                #     file.write(json_string)
-        
-    
-        #ret["avd_connections"] = avd_connections
-        #ret["ext_connections"] = ext_connections
-        #ret["inventory"] = inventory
-        #ret["intf_mapping"] = switch_intf_mapping_dict
-        #ret["modified_connections"] = mapping_switch_all
-        
-        
-        
+
         
         # Create the topology file(s) and vxlan command scripts (if more than one clab host)
         # Create folders for the simulation nodes and put the needed files in there
@@ -532,15 +517,7 @@ class ActionModule(ActionBase):
                 # Cleanup temporary files
                 shutil.rmtree(os.path.dirname(containerlab_dir+node+"/"))
                 shutil.rmtree(os.path.dirname(containerlab_dir+node+"_configs/"))
-                shutil.rmtree(os.path.dirname(containerlab_dir+node+"_mappings/"))
-                # for f in ["vxlan_commands.sh", "vxlan_interface_delete.sh", sim_topology_file_name+".yml", "containerlab_onboarding_token"]:
-                #     try:
-                #         os.remove(containerlab_dir+node+"_"+ f)
-                #     except OSError:
-                #         pass
-                    
-                    
-                    
+                if containerlab_custom_interface_mapping:
+                    shutil.rmtree(os.path.dirname(containerlab_dir+node+"_mappings/"))
 
-#containerlab_config_dir
         return dict(ansible_facts=dict(ret))
