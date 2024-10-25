@@ -288,6 +288,8 @@ class ActionModule(ActionBase):
                                         for tmp_connection in ext_connections:
                                             if (connection["peer_int"] == tmp_connection["peer_int"]) and (connection["peer_name"] == tmp_connection["peer_name"]):
                                                 connection["peer_int"] = "eth"+str(int(connection["peer_int"].split("eth")[1]) + 1)
+                                            else:
+                                                connection["peer_int"] = str(connection["peer_int"].lower())
                                         ext_connections.append(connection)
                                     
                                     # Add the external nodes to a set so that they can be distributed to the simulation hosts afterwards
