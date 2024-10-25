@@ -41,7 +41,7 @@ class ActionModule(ActionBase):
         
         
     def create_clab_topology_nodes(self, distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches,
-                             containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, inventory) -> dict:
+                             containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, inventory) -> dict:
         nodes_dict = {}
         # Create the nodes for Clab topology file
         for distributed_node in distributed_nodes:  
@@ -85,13 +85,15 @@ class ActionModule(ActionBase):
                     if containerlab_enforce_startup_config:
                         node_string += "      enforce-startup-config: true\n"
                     
-                    if (kind in ["ceos","veos"]) and (containerlab_custom_interface_mapping or (containerlab_onboard_to_cvp_token is not None)):
+                    if (kind in ["ceos","veos"]) and (containerlab_custom_interface_mapping or (containerlab_onboard_to_cvp_token is not None) or containerlab_serial_sysmac):
                         node_string += "      binds:\n"
-                    
                     if containerlab_custom_interface_mapping and node in inventory:
                         node_string += "        - "+distributed_node+"_mappings/"+node+".json:/mnt/flash/EosIntfMapping.json:ro\n"
                     if containerlab_onboard_to_cvp_token is not None:
                         node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/token:ro\n"
+                    if containerlab_serial_sysmac and node in inventory:
+                        if "serial_number" in hostvars[node] or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
+                            node_string += "        - "+distributed_node+"_mappings/"+node+"_ceos_config:/mnt/flash/ceos-config:ro\n"
                     
                     if "containerlab" in hostvars[node]:
                         if "bind" in hostvars[node]["containerlab"]:
@@ -127,6 +129,7 @@ class ActionModule(ActionBase):
         sim_topology_file_name = "topology"
         sim_external_node_one_container = False
         containerlab_custom_interface_mapping = False
+        containerlab_serial_sysmac = False
         containerlab_labname = "AVD"
         containerlab_prefix = "__lab-name"
         containerlab_enforce_startup_config = False
@@ -179,6 +182,8 @@ class ActionModule(ActionBase):
                 containerlab_prefix = hostvars[first_sim_node]["containerlab_prefix"]
             if "containerlab_onboard_to_cvp_token" in hostvars[first_sim_node]:
                 containerlab_onboard_to_cvp_token = hostvars[first_sim_node]["containerlab_onboard_to_cvp_token"]
+            if "containerlab_serial_sysmac" in hostvars[first_sim_node]:
+                containerlab_serial_sysmac = hostvars[first_sim_node]["containerlab_serial_sysmac"]
             if "containerlab_mgmt_network_name" in hostvars[first_sim_node]:
                 containerlab_mgmt_network_name = hostvars[first_sim_node]["containerlab_mgmt_network_name"]
             if "containerlab_mgmt_network" in hostvars[first_sim_node]:
@@ -193,7 +198,6 @@ class ActionModule(ActionBase):
                 containerlab_add_mgmt_links = hostvars[first_sim_node]["containerlab_add_mgmt_links"]
             else:
                 containerlab_add_mgmt_links = []
-            
         
         # If sim_env not clab only one simulation node is possible, ex. for ACT. The first node will be choosen
         if sim_env != "clab":
@@ -402,7 +406,6 @@ class ActionModule(ActionBase):
                 mapping_switch_all = {'ManagementIntf':ma_mapping_switch}
                 mapping_switch_all.update({'EthernetIntf':eth_mapping_switch})
                 mapping_switch_mapping_dict[switch] = mapping_switch_all
-
         
         # Create the topology file(s) and vxlan command scripts (if more than one clab host)
         # Create folders for the simulation nodes and put the needed files in there
@@ -410,7 +413,7 @@ class ActionModule(ActionBase):
         links_dict = {}
         if sim_env == "clab":
             nodes_dict = self.create_clab_topology_nodes(distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches,
-                             containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, inventory)
+                             containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, inventory)
             links_dict = self.create_clab_topology_links(sim_connections, containerlab_custom_interface_mapping, switch_intf_mapping_dict, inventory)
              
             
@@ -493,8 +496,19 @@ class ActionModule(ActionBase):
                         with open(filename, 'w') as file:
                             json_string = json.dumps(mapping_switch_mapping_dict[switch], sort_keys=True, indent=4)
                             file.write(json_string)
+                    
+                    # Create the ceos-config with serial number and/or system mac address if defined
+                    if containerlab_serial_sysmac:
+                        if switch in hostvars:
+                            if "serial_number" in hostvars[switch] or ("metadata" in hostvars[switch] and "system_mac_address" in hostvars[switch]["metadata"]):
+                                filename = containerlab_dir+node+"_mappings/"+switch+"_ceos_config"
+                                with open(filename, 'w') as file:
+                                    if "serial_number" in hostvars[switch]:
+                                        file.write("SERIALNUMBER="+hostvars[switch]["serial_number"])
+                                    if "metadata" in hostvars[switch]:
+                                        if "system_mac_address" in hostvars[switch]["metadata"]:
+                                            file.write("\nSYSTEMMACADDR="+hostvars[switch]["metadata"]["system_mac_address" ])
                 
-                                    
             # Package all files needed for each simulation host
             for node in distributed_nodes:
                 filenames = []
