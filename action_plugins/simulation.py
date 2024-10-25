@@ -11,6 +11,8 @@ from string import Template
 from ansible.plugins.action import ActionBase
 from ansible.errors import AnsibleError
 
+role_path = os.path.dirname(os.path.realpath(__file__)) + '/..'
+
 class ActionModule(ActionBase):
     def dedup_connection(self, connection_list, connection) -> bool:
         reversed_connection = {"loc_switch":connection["peer_name"], "loc_int":connection["peer_int"], "peer_name":connection["loc_switch"], "peer_int":connection["loc_int"]}
@@ -150,7 +152,6 @@ class ActionModule(ActionBase):
 
         if first_sim_node:
             inventory_dir = hostvars[first_sim_node].get("sim_inventory_dir_override", hostvars[first_sim_node]["inventory_dir"])
-            playbook_dir = hostvars[first_sim_node].get("sim_playbook_dir_override", hostvars[first_sim_node]["playbook_dir"])
             if "sim_env" in hostvars[first_sim_node]:
                 sim_env = hostvars[first_sim_node]["sim_env"]
             if "sim_include_avd_external_nodes" in hostvars[first_sim_node]:
@@ -437,7 +438,7 @@ class ActionModule(ActionBase):
                     'links': links_dict[node]
                 }
 
-                with open(playbook_dir +'/eos_designs_to_containerlab/templates/containerlab_topology.txt', 'r') as f:
+                with open(f'{role_path}/templates/containerlab_topology.txt', 'r') as f:
                     src = Template(f.read())
                     result = src.substitute(topo_substitute)
                 
@@ -451,7 +452,7 @@ class ActionModule(ActionBase):
                     vxlan_script_substitute = {
                         'connection': "\n".join(sim_connections[node]["local_vx_clab_tools_cmd"])
                     }
-                    with open(playbook_dir +'/eos_designs_to_containerlab/templates/containerlab_vxlan_commands.txt', 'r') as f:
+                    with open(f'{role_path}/templates/containerlab_vxlan_commands.txt', 'r') as f:
                         src = Template(f.read())
                         vxlan_script_result = src.substitute(vxlan_script_substitute)
 
@@ -469,7 +470,7 @@ class ActionModule(ActionBase):
                     vxlan_delete_script_substitute = {
                         'delete_clab_tools_connection': "\n".join(delete_clab_tools_connection)
                     }
-                    with open(playbook_dir +'/eos_designs_to_containerlab/templates/containerlab_vxlan_interface_delete.txt', 'r') as f:
+                    with open(f'{role_path}/templates/containerlab_vxlan_interface_delete.txt', 'r') as f:
                         src = Template(f.read())
                         vxlan_delete_script_result = src.substitute(vxlan_delete_script_substitute)
 
