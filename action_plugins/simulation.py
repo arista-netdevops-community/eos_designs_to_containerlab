@@ -152,6 +152,7 @@ class ActionModule(ActionBase):
 
         if first_sim_node:
             inventory_dir = hostvars[first_sim_node].get("sim_inventory_dir_override", hostvars[first_sim_node]["inventory_dir"])
+            global role_path
             if "playbook_dir_override" in hostvars[first_sim_node]:
                 role_path = hostvars[first_sim_node]["playbook_dir_override"]
             if "sim_env" in hostvars[first_sim_node]:
