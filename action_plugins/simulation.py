@@ -73,13 +73,14 @@ class ActionModule(ActionBase):
                         first_entry = True
                         for mgmt_int in hostvars[node]["management_interfaces"]:
                             if first_entry:
-                                if "type" in mgmt_int:
+                                if "type" in mgmt_int and "Vlan" not in mgmt_int["name"]:
                                     if mgmt_int["type"] == 'oob':
                                         mgmt_ipv4 = mgmt_int["ip_address"].split("/")[0]
                                         first_entry = False
                     else:
                         raise AnsibleError("Node %s has no defined management_interfaces." % node)
-                    node_string += "      mgmt-ipv4: "+mgmt_ipv4+"\n"
+                    if mgmt_ipv4 != "":
+                        node_string += "      mgmt-ipv4: "+mgmt_ipv4+"\n"
                     
                     if (kind in ["ceos","veos"]):    
                         node_string += "      startup-config: "+distributed_node+"_configs/"+node+".cfg\n"
@@ -313,7 +314,7 @@ class ActionModule(ActionBase):
         # Additional containerlab mgmt connection defined in vars of SIMULATION Host                         
         for element in containerlab_add_mgmt_links:
             tmp_conn = {"loc_switch":element["node"], "loc_int":element["intf"], "peer_name":"mgmt-net", "peer_int":element["node"]+"-"+element["intf"]}
-            print (tmp_conn)
+            # print (tmp_conn)
             ext_connections.append(tmp_conn)
 
         # Distribute the external nodes to the simulation hosts afterwards                        
@@ -399,7 +400,7 @@ class ActionModule(ActionBase):
                     first_entry = True
                     for mgmt_int in hostvars[switch]["management_interfaces"]:
                       if first_entry:
-                          if "type" in mgmt_int:
+                          if "type" in mgmt_int and "Vlan" not in mgmt_int["name"]:
                             if mgmt_int["type"] == 'oob':
                                 ma_mapping_switch.update({ 'eth0':mgmt_int["name"] })
                                 first_entry = False
