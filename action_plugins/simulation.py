@@ -51,8 +51,8 @@ class ActionModule(ActionBase):
             node_string = ""
             
             for node, kind_image in distributed_nodes[distributed_node].items():
-                kind = kind_image[list(kind_image.keys())[0]]
-                image = kind_image[list(kind_image.keys())[1]]
+                kind = kind_image["kind"]
+                image = kind_image["image"]
                 node_hostvars_exist = True
                 try:
                     node_hostvar = hostvars[node]
