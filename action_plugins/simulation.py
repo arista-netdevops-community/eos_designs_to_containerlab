@@ -432,7 +432,7 @@ class ActionModule(ActionBase):
                     cvp_token_filename = containerlab_dir+node+"_containerlab_onboarding_token"
                     os.makedirs(os.path.dirname(cvp_token_filename), exist_ok=True)
                     with open(cvp_token_filename, "w") as fh:
-                        fh.write(containerlab_onboard_to_cvp_token)
+                        fh.write(str(containerlab_onboard_to_cvp_token))
                                     
                 # Create Containerlab Topo
                 topo_substitute = {
