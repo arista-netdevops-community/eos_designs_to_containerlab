@@ -491,7 +491,7 @@ class ActionModule(ActionBase):
                 # Create config and mapping directories for each simulation nodes and put the needed files into these directories
                 os.makedirs(os.path.dirname(containerlab_dir+node+"_configs/"), exist_ok=True)
                 
-                if containerlab_custom_interface_mapping:
+                if containerlab_custom_interface_mapping or containerlab_serial_sysmac:
                     os.makedirs(os.path.dirname(containerlab_dir+node+"_mappings/"), exist_ok=True)
                                
                 # Copy config files and create mapping files per simulation node
