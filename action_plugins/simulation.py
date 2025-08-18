@@ -132,6 +132,7 @@ class ActionModule(ActionBase):
         sim_topology_file_name = "topology"
         sim_external_node_one_container = False
         containerlab_custom_interface_mapping = False
+        containerlab_custom_interface_mapping_same_number = False
         containerlab_serial_sysmac = False
         containerlab_labname = "AVD"
         containerlab_prefix = "__lab-name"
@@ -175,6 +176,8 @@ class ActionModule(ActionBase):
 
             if "containerlab_custom_interface_mapping" in hostvars[first_sim_node]:
                 containerlab_custom_interface_mapping = hostvars[first_sim_node]["containerlab_custom_interface_mapping"]
+            if "containerlab_custom_interface_mapping_same_number" in hostvars[first_sim_node]:
+                containerlab_custom_interface_mapping_same_number = hostvars[first_sim_node]["containerlab_custom_interface_mapping_same_number"]    
             if "containerlab_vxlan_base" in hostvars[first_sim_node]:
                 vxlan_base = hostvars[first_sim_node]["containerlab_vxlan_base"]
             if "containerlab_enforce_startup_config" in hostvars[first_sim_node]:
@@ -257,9 +260,14 @@ class ActionModule(ActionBase):
                         
                         # create EOS interface to linux eth mapping if needed
                         if containerlab_custom_interface_mapping:
-                            tmp_intf_mapping = {str((eth["name"].split("."))[0]):"eth"+str(intf_counter)}
-                            switch_intf_mapping_dict[switch].update(tmp_intf_mapping)
-                            intf_counter += 1
+                            if containerlab_custom_interface_mapping_same_number:
+                                eos_intf_number = str((eth["name"].split("."))[0]).replace("Ethernet","").replace("/","")
+                                tmp_intf_mapping = {str((eth["name"].split("."))[0]):"eth"+str(eos_intf_number)}
+                                switch_intf_mapping_dict[switch].update(tmp_intf_mapping)
+                            else:    
+                                tmp_intf_mapping = {str((eth["name"].split("."))[0]):"eth"+str(intf_counter)}
+                                switch_intf_mapping_dict[switch].update(tmp_intf_mapping)
+                                intf_counter += 1
 
                         # if sim_env is 'clab' replace 'Ethernet' with 'eth' and '/' with '_'      
                         if sim_env == "clab" and not containerlab_custom_interface_mapping:
