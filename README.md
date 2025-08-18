@@ -46,6 +46,7 @@ The following default variables are defined, and can be modified as desired:
 ```
 
 - `containerlab_custom_interface_mapping`: Should a custom interface mapping be created based on the AVD defined interfaces, this option also changes the management interface to what is defined for the nodes in eos_designs. Supported in cEOS-lab 4.28.0F and later. Should be set to true if Management 1 is used as management interface. (default: false)
+- `containerlab_custom_interface_mapping_same_number`: If 'containerlab_custom_interface_mapping' is enabled, this knob can be used to map the EOS interface number to a meaningful linux interface number, ex. Ethernet56/1 to eth561. Per default the linux interfaces are just counted up eth1, eth2, ect. (default: false)
 - `containerlab_serial_sysmac`: Use system_mac_address and serial_number AVD parameters to create a ceos-config file. This will statically set the serial number and system mac address. (default: false)
 - `containerlab_labname`: Name of the containerlab lab. (default: AVD)
 - `containerlab_prefix`: Prefix which will be used for the node containers, see https://containerlab.dev/manual/topo-def-file/#prefix. (default: __lab-name)
