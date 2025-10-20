@@ -95,7 +95,7 @@ class ActionModule(ActionBase):
                     if containerlab_onboard_to_cvp_token is not None:
                         node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/token:ro\n"
                     if containerlab_serial_sysmac and (kind in ["ceos","veos"]):
-                        if "serial_number" in hostvars[node] or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
+                        if "serial_number" in hostvars[node] or ("metadata" in hostvars[switch] and "serial_number" in hostvars[switch]["metadata"]) or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
                             node_string += "        - "+distributed_node+"_mappings/"+node+"_ceos_config:/mnt/flash/ceos-config:ro\n"
                     
                     if "containerlab" in hostvars[node]:
@@ -519,11 +519,13 @@ class ActionModule(ActionBase):
                     # Create the ceos-config with serial number and/or system mac address if defined
                     if containerlab_serial_sysmac:
                         if switch in hostvars:
-                            if "serial_number" in hostvars[switch] or ("metadata" in hostvars[switch] and "system_mac_address" in hostvars[switch]["metadata"]):
+                            if "serial_number" in hostvars[switch] or ("metadata" in hostvars[switch] and "serial_number" in hostvars[switch]["metadata"]) or ("metadata" in hostvars[switch] and "system_mac_address" in hostvars[switch]["metadata"]):
                                 filename = containerlab_dir+node+"_mappings/"+switch+"_ceos_config"
                                 with open(filename, 'w') as file:
                                     if "serial_number" in hostvars[switch]:
                                         file.write("SERIALNUMBER="+hostvars[switch]["serial_number"])
+                                    elif "metadata" in hostvars[switch] and "serial_number" in hostvars[switch]["metadata"]:
+                                        file.write("SERIALNUMBER="+hostvars[switch]["metadata"]["serial_number"])
                                     if "metadata" in hostvars[switch]:
                                         if "system_mac_address" in hostvars[switch]["metadata"]:
                                             file.write("\nSYSTEMMACADDR="+hostvars[switch]["metadata"]["system_mac_address" ])
