@@ -95,7 +95,7 @@ class ActionModule(ActionBase):
                     if containerlab_onboard_to_cvp_token is not None:
                         node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/token:ro\n"
                     if containerlab_serial_sysmac and (kind in ["ceos","veos"]):
-                        if "serial_number" in hostvars[node] or ("metadata" in hostvars[switch] and "serial_number" in hostvars[switch]["metadata"]) or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
+                        if "serial_number" in hostvars[node] or ("metadata" in hostvars[node] and "serial_number" in hostvars[node]["metadata"]) or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
                             node_string += "        - "+distributed_node+"_mappings/"+node+"_ceos_config:/mnt/flash/ceos-config:ro\n"
                     
                     if "containerlab" in hostvars[node]:
