@@ -35,7 +35,7 @@
 
 - name: Destroy the lab using installed containerlab
   become: true
-  command: "clab destroy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.yml --cleanup"
+  command: "clab destroy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.yml --cleanup{% if containerlab_runtime is defined and containerlab_runtime != 'docker' %} --runtime {{ containerlab_runtime }}{% endif %}"
   args:
     chdir: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
   when: containerlab_mode == 'installed' and stat_result.stat.exists and containerlab_deploy_on_hosts
