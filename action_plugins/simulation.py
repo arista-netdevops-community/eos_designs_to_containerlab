@@ -25,7 +25,7 @@ class ActionModule(ActionBase):
                 result.append(item)
         return result
     
-    def create_clab_topology_links(self, sim_connections, containerlab_custom_interface_mapping, switch_intf_mapping_dict, inventory) -> dict:
+    def create_clab_topology_links(self, sim_connections, containerlab_custom_interface_mapping, switch_intf_mapping_dict, inventory, sim_ztp, sim_ztp_folder) -> dict:
         links_dict = {}
         
         for distributed_node in sim_connections:
@@ -43,7 +43,7 @@ class ActionModule(ActionBase):
         
         
     def create_clab_topology_nodes(self, distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches,
-                             containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, inventory) -> dict:
+                             containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, inventory, sim_ztp, sim_ztp_folder) -> dict:
         nodes_dict = {}
         # Create the nodes for Clab topology file
         for distributed_node in distributed_nodes:  
@@ -81,10 +81,13 @@ class ActionModule(ActionBase):
                         raise AnsibleError("Node %s has no defined management_interfaces." % node)
                     if mgmt_ipv4 != "":
                         node_string += "      mgmt-ipv4: "+mgmt_ipv4+"\n"
-                    
                     if (kind in ["ceos","veos"]):    
-                        node_string += "      startup-config: "+distributed_node+"_configs/"+node+".cfg\n"
-                    
+                        if sim_ztp:
+                            # Use /dev/null to enable ZTP
+                            node_string += "      startup-config: /dev/null\n"
+                        else:
+                            # Use actual configs
+                            node_string += "      startup-config: "+distributed_node+"_configs/"+node+".cfg\n"
                     if containerlab_enforce_startup_config:
                         node_string += "      enforce-startup-config: true\n"
                     
@@ -111,9 +114,34 @@ class ActionModule(ActionBase):
                 
                 batch_count += 1
             
+        # Add ZTP infrastructure only if sim_ztp is enabled
+        if sim_ztp:
+            # Try to extract from any switch's management interface first
+            for node_name in distributed_nodes[distributed_node]:
+                if node_name in hostvars and "management_interfaces" in hostvars[node_name]:
+                    for mgmt_int in hostvars[node_name]["management_interfaces"]:
+                        if "type" in mgmt_int and mgmt_int["type"] == 'oob' and "ip_address" in mgmt_int:
+                            mgmt_network = netaddr.IPNetwork(mgmt_int["ip_address"])
+                            # Use .254 and .253 from the subnet
+                            dhcp_ip = str(netaddr.IPAddress(mgmt_network.network) + (mgmt_network.size - 2))
+                            http_ip = str(netaddr.IPAddress(mgmt_network.network) + (mgmt_network.size - 3))
+                            break
+                    break
             
-            nodes_dict[distributed_node] = node_string
-            
+            node_string += f"""    dhcp:
+      kind: linux
+      image: networkboot/dhcpd:latest
+      mgmt-ipv4: {dhcp_ip}
+      binds:
+      - {sim_ztp_folder}:/data
+    http:
+      kind: linux
+      image: nginx:alpine
+      binds:
+      - {sim_ztp_folder}:/usr/share/nginx/html:ro
+      mgmt-ipv4: {http_ip}
+"""
+            nodes_dict[distributed_node] = node_string            
         return nodes_dict
     
     def run(self, tmp=None, task_vars=None):
@@ -131,6 +159,8 @@ class ActionModule(ActionBase):
         sim_ceos_version = "ceos:latest"
         sim_topology_file_name = "topology"
         sim_external_node_one_container = False
+        sim_ztp = False
+        sim_ztp_folder = "/workspaces/avd/dhcp/"
         containerlab_custom_interface_mapping = False
         containerlab_custom_interface_mapping_same_number = False
         containerlab_serial_sysmac = False
@@ -173,6 +203,10 @@ class ActionModule(ActionBase):
                 sim_configs_dir = hostvars[first_sim_node]["sim_configs_dir"]
             else:
                 sim_configs_dir = inventory_dir + "/intended/configs/"
+            if "sim_ztp" in hostvars[first_sim_node]:
+                sim_ztp = hostvars[first_sim_node]["sim_ztp"]
+            if "sim_ztp_folder" in hostvars[first_sim_node]:
+                sim_ztp_folder = hostvars[first_sim_node]["sim_ztp_folder"]
 
             if "containerlab_custom_interface_mapping" in hostvars[first_sim_node]:
                 containerlab_custom_interface_mapping = hostvars[first_sim_node]["containerlab_custom_interface_mapping"]
@@ -432,8 +466,8 @@ class ActionModule(ActionBase):
         links_dict = {}
         if sim_env == "clab":
             nodes_dict = self.create_clab_topology_nodes(distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches,
-                             containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, inventory)
-            links_dict = self.create_clab_topology_links(sim_connections, containerlab_custom_interface_mapping, switch_intf_mapping_dict, inventory)
+                             containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, inventory, sim_ztp, sim_ztp_folder)
+            links_dict = self.create_clab_topology_links(sim_connections, containerlab_custom_interface_mapping, switch_intf_mapping_dict, inventory, sim_ztp, sim_ztp_folder)
              
             
             for node in distributed_nodes:

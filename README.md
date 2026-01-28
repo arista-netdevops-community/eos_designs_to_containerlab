@@ -44,6 +44,20 @@ The following default variables are defined, and can be modified as desired:
             kind: 'ceos'
             image: 'ceos:4.31.1F'
 ```
+- `sim_ztp:` Enables ZTP support on ceos and veos nodes by setting the startup configuration to '/dev/null'. It also spawns two extra containers connected to the .253 and .254 for http and dhcp servers respectively.
+- `sim_ztp_folder:` This is the path where your dhcpd.conf and bootstrap.py to start ZTP should be located. Example bootstrap script can be found on: https://github.com/aristanetworks/cloudvision-ztpaas-utils. Example dhcpd.conf:
+
+```
+authoritative;
+default-lease-time 600;
+max-lease-time 7200;
+subnet 172.16.1.0 netmask 255.255.255.0 {
+  range 172.16.1.11 172.16.1.90;
+  option routers 172.16.1.1;
+  option domain-name-servers 1.1.1.1;
+  option bootfile-name "http://172.16.1.253/bootstrap.py";
+}
+```
 
 - `containerlab_custom_interface_mapping`: Should a custom interface mapping be created based on the AVD defined interfaces, this option also changes the management interface to what is defined for the nodes in eos_designs. Supported in cEOS-lab 4.28.0F and later. Should be set to true if Management 1 is used as management interface. (default: false)
 - `containerlab_custom_interface_mapping_same_number`: If 'containerlab_custom_interface_mapping' is enabled, this knob can be used to map the EOS interface number to a meaningful linux interface number, ex. Ethernet56/1 to eth561. Per default the linux interfaces are just counted up eth1, eth2, ect. (default: false)
