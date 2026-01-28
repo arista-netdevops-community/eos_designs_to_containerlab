@@ -78,12 +78,13 @@
 
 - name: Creating run parameters for containerlab deploy
   set_fact:
-    containerlab_cmd: "\
-    --reconfigure \
-    {% if containerlab_max_workers is defined %} --max-workers {{ containerlab_max_workers }}{% endif %}\
-    {% if containerlab_timeout is defined %} --timeout {{ containerlab_timeout }}{% endif %}\
-    {% if containerlab_skip_post_deploy is defined %}{% if containerlab_skip_post_deploy %} --skip-post-deploy {% endif %}{% endif %}\
-    {% if containerlab_debug is defined %}{% if containerlab_debug %} -d {% endif %}{% endif %}"
+    containerlab_cmd: >-
+      --reconfigure
+      {% if containerlab_runtime is defined and containerlab_runtime != 'docker' %} --runtime {{ containerlab_runtime }}{% endif %}
+      {% if containerlab_max_workers is defined %} --max-workers {{ containerlab_max_workers }}{% endif %}
+      {% if containerlab_timeout is defined %} --timeout {{ containerlab_timeout }}{% endif %}
+      {% if containerlab_skip_post_deploy is defined %}{% if containerlab_skip_post_deploy %} --skip-post-deploy {% endif %}{% endif %}
+      {% if containerlab_debug is defined %}{% if containerlab_debug %} -d {% endif %}{% endif %}
   delegate_to: localhost
   run_once: true
   when: containerlab_deploy_on_hosts
