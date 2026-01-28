@@ -25,7 +25,7 @@ class ActionModule(ActionBase):
                 result.append(item)
         return result
     
-    def create_clab_topology_links(self, sim_connections, containerlab_custom_interface_mapping, switch_intf_mapping_dict, inventory, sim_ztp, sim_ztp_folder) -> dict:
+    def create_clab_topology_links(self, sim_connections, containerlab_custom_interface_mapping, switch_intf_mapping_dict, inventory) -> dict:
         links_dict = {}
         
         for distributed_node in sim_connections:
@@ -467,7 +467,7 @@ class ActionModule(ActionBase):
         if sim_env == "clab":
             nodes_dict = self.create_clab_topology_nodes(distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches,
                              containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, inventory, sim_ztp, sim_ztp_folder)
-            links_dict = self.create_clab_topology_links(sim_connections, containerlab_custom_interface_mapping, switch_intf_mapping_dict, inventory, sim_ztp, sim_ztp_folder)
+            links_dict = self.create_clab_topology_links(sim_connections, containerlab_custom_interface_mapping, switch_intf_mapping_dict, inventory)
              
             
             for node in distributed_nodes:
