@@ -14,7 +14,6 @@
   delegate_to: localhost
   include_vars:
     file: "{{ filename }}"
-  # errors='ignore' is needed for compatibility with ansible-core < 2.12
   when: structured_config is not defined and lookup('first_found', filename, skip=True) | length > 0
   vars:
     filename: "{{ structured_dir }}/{{ inventory_hostname }}.yml"
