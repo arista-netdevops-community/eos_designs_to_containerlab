@@ -114,21 +114,21 @@ class ActionModule(ActionBase):
                 
                 batch_count += 1
             
-        # Add ZTP infrastructure only if sim_ztp is enabled
-        if sim_ztp:
-            # Try to extract from any switch's management interface first
-            for node_name in distributed_nodes[distributed_node]:
-                if node_name in hostvars and "management_interfaces" in hostvars[node_name]:
-                    for mgmt_int in hostvars[node_name]["management_interfaces"]:
-                        if "type" in mgmt_int and mgmt_int["type"] == 'oob' and "ip_address" in mgmt_int:
-                            mgmt_network = netaddr.IPNetwork(mgmt_int["ip_address"])
-                            # Use .254 and .253 from the subnet
-                            dhcp_ip = str(netaddr.IPAddress(mgmt_network.network) + (mgmt_network.size - 2))
-                            http_ip = str(netaddr.IPAddress(mgmt_network.network) + (mgmt_network.size - 3))
-                            break
-                    break
-            
-            node_string += f"""    dhcp:
+            # Add ZTP infrastructure only if sim_ztp is enabled
+            if sim_ztp:
+                # Try to extract from any switch's management interface first
+                for node_name in distributed_nodes[distributed_node]:
+                    if node_name in hostvars and "management_interfaces" in hostvars[node_name]:
+                        for mgmt_int in hostvars[node_name]["management_interfaces"]:
+                            if "type" in mgmt_int and mgmt_int["type"] == 'oob' and "ip_address" in mgmt_int:
+                                mgmt_network = netaddr.IPNetwork(mgmt_int["ip_address"])
+                                # Use .254 and .253 from the subnet
+                                dhcp_ip = str(netaddr.IPAddress(mgmt_network.network) + (mgmt_network.size - 2))
+                                http_ip = str(netaddr.IPAddress(mgmt_network.network) + (mgmt_network.size - 3))
+                                break
+                        break
+                
+                node_string += f"""    dhcp:
       kind: linux
       image: networkboot/dhcpd:latest
       mgmt-ipv4: {dhcp_ip}
@@ -283,6 +283,9 @@ class ActionModule(ActionBase):
                 intf_counter = 1
                 switch_intf_mapping_dict[switch] = {}
                 for eth in hostvars[switch]["ethernet_interfaces"]:
+                    # For AVD >= 6.0 extract the metadata parts, like peer, peer_interface and peer_type
+                    if "metadata" in eth:
+                        eth.update(eth["metadata"])
                     
                     # Ignore ethernet interfaces which don't have a peer_interface defined, this is for example when using eos_designs -> network_ports
                     if "peer_interface" in eth:
