@@ -14,7 +14,7 @@ structured_dir_name: 'structured_configs'
 structured_dir: '{{ output_dir }}/{{ structured_dir_name }}'
 
 # Defaults for running containerlab
-containerlab_dir_name: 'containerlab'
+containerlab_dir_name: 'simulation'
 containerlab_dir: '{{ output_dir }}/{{ containerlab_dir_name }}'
 containerlab_mode: installed
 containerlab_labname: AVD
