@@ -14,7 +14,7 @@
 
 - name: Check if there is already a topology file with the same name
   stat:
-    path: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}/{{inventory_hostname}}_{{ sim_topology_file_name }}.yml"
+    path: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}/{{inventory_hostname}}_{{ sim_topology_file_name }}.clab.yml"
   register: stat_result
 
 - name: Destroy the lab using containerlab in a container
@@ -30,12 +30,12 @@
     --pid='host' \
     -v {{ ansible_facts.env.PWD }}:{{ ansible_facts.env.PWD }} \
     -w {{ ansible_facts.env.PWD }}/{{ containerlab_labname }} \
-    ghcr.io/srl-labs/clab clab destroy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.yml --cleanup "
+    ghcr.io/srl-labs/clab clab destroy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.clab.yml --cleanup "
   when: containerlab_mode == 'container' and stat_result.stat.exists and containerlab_deploy_on_hosts
 
 - name: Destroy the lab using installed containerlab
   become: true
-  command: "clab destroy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.yml --cleanup{% if containerlab_runtime is defined and containerlab_runtime != 'docker' %} --runtime {{ containerlab_runtime }}{% endif %}"
+  command: "clab destroy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.clab.yml --cleanup{% if containerlab_runtime is defined and containerlab_runtime != 'docker' %} --runtime {{ containerlab_runtime }}{% endif %}"
   args:
     chdir: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
   when: containerlab_mode == 'installed' and stat_result.stat.exists and containerlab_deploy_on_hosts
@@ -102,7 +102,7 @@
     --pid='host' \
     -v {{ ansible_facts.env.PWD }}:{{ ansible_facts.env.PWD }} \
     -w {{ ansible_facts.env.PWD }}/{{ containerlab_labname }} \
-    ghcr.io/srl-labs/clab clab deploy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.yml {{ containerlab_cmd }} "
+    ghcr.io/srl-labs/clab clab deploy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.clab.yml {{ containerlab_cmd }} "
   when: containerlab_mode == 'container' and containerlab_deploy_on_hosts
 
 - name: Run the containerlab vxlan commands (container clab)
@@ -123,7 +123,7 @@
 
 - name: Deploy the lab using installed containerlab
   become: true
-  command: "clab deploy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.yml {{ containerlab_cmd }} "
+  command: "clab deploy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.clab.yml {{ containerlab_cmd }} "
   args:
     chdir: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
   when: containerlab_mode == 'installed' and containerlab_deploy_on_hosts

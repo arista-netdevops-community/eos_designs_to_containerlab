@@ -92,7 +92,7 @@ class ActionModule(ActionBase):
                         node_string += "      binds:\n"
                     if containerlab_custom_interface_mapping and node in inventory:
                         node_string += "        - "+distributed_node+"_mappings/"+node+".json:/mnt/flash/EosIntfMapping.json:ro\n"
-                    if containerlab_onboard_to_cvp_token is not None:
+                    if containerlab_onboard_to_cvp_token is not None and not sim_ztp:
                         node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/token:ro\n"
                     if containerlab_serial_sysmac and (kind in ["ceos","veos"]):
                         if "serial_number" in hostvars[node] or ("metadata" in hostvars[node] and "serial_number" in hostvars[node]["metadata"]) or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
@@ -448,7 +448,7 @@ class ActionModule(ActionBase):
                     src = Template(f.read())
                     result = src.substitute(topo_substitute)
                 
-                filename = sim_dir+node+"_"+sim_topology_file_name+".yml"
+                filename = sim_dir+node+"_"+sim_topology_file_name+".clab.yml"
                 os.makedirs(os.path.dirname(filename), exist_ok=True)
                 with open(filename, "w") as fh:
                     fh.write(result)
