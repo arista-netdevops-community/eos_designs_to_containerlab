@@ -75,8 +75,6 @@ class ActionModule(ActionBase):
                             None
                         )
                         mgmt_ipv4 = oob_int["ip_address"].split("/")[0] if oob_int else ""
-                    else:
-                        raise AnsibleError("Node %s has no defined management_interfaces." % node)
                     if mgmt_ipv4 != "":
                         node_string += "      mgmt-ipv4: "+mgmt_ipv4+"\n" 
                     if sim_ztp:
