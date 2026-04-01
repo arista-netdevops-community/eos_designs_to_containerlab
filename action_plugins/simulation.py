@@ -2,7 +2,6 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 import json
 import os
-import yaml
 import netaddr
 import shutil
 import glob
@@ -11,12 +10,13 @@ from string import Template
 from ansible.plugins.action import ActionBase
 from ansible.errors import AnsibleError
 
-role_path = os.path.dirname(os.path.realpath(__file__)) + '/..'
-
 class ActionModule(ActionBase):
-    def dedup_connection(self, connection_list, connection) -> bool:
+    def _is_reverse_connection_present(self, connection_list, connection) -> bool:
         reversed_connection = {"loc_switch":connection["peer_name"], "loc_int":connection["peer_int"], "peer_name":connection["loc_switch"], "peer_int":connection["loc_int"]}
         return reversed_connection in connection_list
+    
+    def _eos_intf_to_clab(self, name: str) -> str:
+        return name.split(".")[0].replace("Ethernet", "eth").replace("/", "_")
     
     def unique(self, sequence):
         result = []
@@ -25,7 +25,7 @@ class ActionModule(ActionBase):
                 result.append(item)
         return result
     
-    def create_clab_topology_links(self, sim_connections, containerlab_custom_interface_mapping, switch_intf_mapping_dict, inventory) -> dict:
+    def create_clab_topology_links(self, sim_connections) -> dict:
         links_dict = {}
         
         for distributed_node in sim_connections:
@@ -58,7 +58,6 @@ class ActionModule(ActionBase):
                     node_hostvar = hostvars[node]
                 except Exception as e:
                     node_hostvars_exist = False
-                    #raise AnsibleError("Node %s is not defined in the hostvars, most probably it is missing from the inventory.%s" % (node))
                 
                 node_string += "    "+ node + ":\n"
                 node_string += "      kind: "+kind+"\n"
@@ -70,24 +69,22 @@ class ActionModule(ActionBase):
                 if node_hostvars_exist and kind in ["ceos","veos"]:
                     mgmt_ipv4 = ""
                     if "management_interfaces" in hostvars[node]:
-                        first_entry = True
-                        for mgmt_int in hostvars[node]["management_interfaces"]:
-                            if first_entry:
-                                if "type" in mgmt_int and "Vlan" not in mgmt_int["name"]:
-                                    if mgmt_int["type"] == 'oob':
-                                        mgmt_ipv4 = mgmt_int["ip_address"].split("/")[0]
-                                        first_entry = False
+                        oob_int = next(
+                            (m for m in hostvars[node]["management_interfaces"]
+                            if m.get("type") == "oob" and "Vlan" not in m["name"]),
+                            None
+                        )
+                        mgmt_ipv4 = oob_int["ip_address"].split("/")[0] if oob_int else ""
                     else:
                         raise AnsibleError("Node %s has no defined management_interfaces." % node)
                     if mgmt_ipv4 != "":
-                        node_string += "      mgmt-ipv4: "+mgmt_ipv4+"\n"
-                    if (kind in ["ceos","veos"]):    
-                        if sim_ztp:
-                            # Use /dev/null to enable ZTP
-                            node_string += "      startup-config: /dev/null\n"
-                        else:
-                            # Use actual configs
-                            node_string += "      startup-config: "+distributed_node+"_configs/"+node+".cfg\n"
+                        node_string += "      mgmt-ipv4: "+mgmt_ipv4+"\n" 
+                    if sim_ztp:
+                        # Use /dev/null to enable ZTP
+                        node_string += "      startup-config: /dev/null\n"
+                    else:
+                        # Use actual configs
+                        node_string += "      startup-config: "+distributed_node+"_configs/"+node+".cfg\n"
                     if containerlab_enforce_startup_config:
                         node_string += "      enforce-startup-config: true\n"
                     
@@ -95,7 +92,7 @@ class ActionModule(ActionBase):
                         node_string += "      binds:\n"
                     if containerlab_custom_interface_mapping and node in inventory:
                         node_string += "        - "+distributed_node+"_mappings/"+node+".json:/mnt/flash/EosIntfMapping.json:ro\n"
-                    if containerlab_onboard_to_cvp_token is not None:
+                    if containerlab_onboard_to_cvp_token is not None and not sim_ztp:
                         node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/token:ro\n"
                     if containerlab_serial_sysmac and (kind in ["ceos","veos"]):
                         if "serial_number" in hostvars[node] or ("metadata" in hostvars[node] and "serial_number" in hostvars[node]["metadata"]) or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
@@ -151,95 +148,53 @@ class ActionModule(ActionBase):
         hostvars = task_vars.get("hostvars", {})
         groups = task_vars.get("groups", {})
 
-        # Default variables
-        sim_env = "clab"
-        vxlan_base = 100
-        sim_include_avd_external_nodes = False
-        sim_external_nodes_map = {}
-        sim_ceos_version = "ceos:latest"
-        sim_topology_file_name = "topology"
-        sim_external_node_one_container = False
-        sim_ztp = False
-        sim_ztp_folder = "/workspaces/avd/dhcp/"
-        containerlab_custom_interface_mapping = False
-        containerlab_custom_interface_mapping_same_number = False
-        containerlab_serial_sysmac = False
-        containerlab_labname = "AVD"
-        containerlab_prefix = "__lab-name"
-        containerlab_enforce_startup_config = False
-        containerlab_deploy_startup_batches = 20
-        containerlab_onboard_to_cvp_token = None
-        containerlab_mgmt_network_name = "MGMT"
-        containerlab_mgmt_network = None
-        containerlab_linux_kind_bind_dir = None
         
         first_sim_node = None
         all_sim_nodes = []
         if "SIMULATION" in groups:
-            first_sim_node = groups["SIMULATION"][0] if groups["SIMULATION"][0] else None
-            if len(groups["SIMULATION"]) > 1 and sim_env == "clab":
-                all_sim_nodes = groups["SIMULATION"]
+            if len(groups["SIMULATION"]) == 0:
+                raise AnsibleError("No simulation host defined under the SIMULATION group in the inventory")
             else:
-                all_sim_nodes.append(first_sim_node)
+                if groups["SIMULATION"][0]:
+                    first_sim_node = groups["SIMULATION"][0]
+                if len(groups["SIMULATION"]) > 1:
+                    all_sim_nodes = groups["SIMULATION"]
+                else:
+                    all_sim_nodes.append(first_sim_node)
+        else:
+            raise AnsibleError("SIMULATION not defined in the inventory")
 
         if first_sim_node:
-            inventory_dir = hostvars[first_sim_node].get("sim_inventory_dir_override", hostvars[first_sim_node]["inventory_dir"])
-            global role_path
-            if "playbook_dir_override" in hostvars[first_sim_node]:
-                role_path = hostvars[first_sim_node]["playbook_dir_override"]
-            if "sim_env" in hostvars[first_sim_node]:
-                sim_env = hostvars[first_sim_node]["sim_env"]
-            if "sim_include_avd_external_nodes" in hostvars[first_sim_node]:
-                sim_include_avd_external_nodes = hostvars[first_sim_node]["sim_include_avd_external_nodes"]
-            if "sim_external_nodes_map" in hostvars[first_sim_node]:
-                sim_external_nodes_map = hostvars[first_sim_node]["sim_external_nodes_map"]
-            if "sim_external_node_one_container" in hostvars[first_sim_node]:
-                sim_external_node_one_container = hostvars[first_sim_node]["sim_external_node_one_container"]
-            if "sim_ceos_version" in hostvars[first_sim_node]:
-                sim_ceos_version = hostvars[first_sim_node]["sim_ceos_version"]
-            if "sim_topology_file_name" in hostvars[first_sim_node]:
-                sim_topology_file_name = hostvars[first_sim_node]["sim_topology_file_name"]
-            if "sim_configs_dir" in hostvars[first_sim_node]:
-                sim_configs_dir = hostvars[first_sim_node]["sim_configs_dir"]
-            else:
-                sim_configs_dir = inventory_dir + "/intended/configs/"
-            if "sim_ztp" in hostvars[first_sim_node]:
-                sim_ztp = hostvars[first_sim_node]["sim_ztp"]
-            if "sim_ztp_folder" in hostvars[first_sim_node]:
-                sim_ztp_folder = hostvars[first_sim_node]["sim_ztp_folder"]
-
-            if "containerlab_custom_interface_mapping" in hostvars[first_sim_node]:
-                containerlab_custom_interface_mapping = hostvars[first_sim_node]["containerlab_custom_interface_mapping"]
-            if "containerlab_custom_interface_mapping_same_number" in hostvars[first_sim_node]:
-                containerlab_custom_interface_mapping_same_number = hostvars[first_sim_node]["containerlab_custom_interface_mapping_same_number"]    
-            if "containerlab_vxlan_base" in hostvars[first_sim_node]:
-                vxlan_base = hostvars[first_sim_node]["containerlab_vxlan_base"]
-            if "containerlab_enforce_startup_config" in hostvars[first_sim_node]:
-                containerlab_enforce_startup_config = hostvars[first_sim_node]["containerlab_enforce_startup_config"]
-            if "containerlab_deploy_startup_batches" in hostvars[first_sim_node]:
-                containerlab_deploy_startup_batches = hostvars[first_sim_node]["containerlab_deploy_startup_batches"]
-            if "containerlab_labname" in hostvars[first_sim_node]:
-                containerlab_labname = hostvars[first_sim_node]["containerlab_labname"]
-            if "containerlab_prefix" in hostvars[first_sim_node]:
-                containerlab_prefix = hostvars[first_sim_node]["containerlab_prefix"]
-            if "containerlab_onboard_to_cvp_token" in hostvars[first_sim_node]:
-                containerlab_onboard_to_cvp_token = hostvars[first_sim_node]["containerlab_onboard_to_cvp_token"]
-            if "containerlab_serial_sysmac" in hostvars[first_sim_node]:
-                containerlab_serial_sysmac = hostvars[first_sim_node]["containerlab_serial_sysmac"]
-            if "containerlab_mgmt_network_name" in hostvars[first_sim_node]:
-                containerlab_mgmt_network_name = hostvars[first_sim_node]["containerlab_mgmt_network_name"]
-            if "containerlab_mgmt_network" in hostvars[first_sim_node]:
-                containerlab_mgmt_network = hostvars[first_sim_node]["containerlab_mgmt_network"]
-            if "containerlab_linux_kind_bind_dir" in hostvars[first_sim_node]:
-                containerlab_linux_kind_bind_dir = hostvars[first_sim_node]["containerlab_linux_kind_bind_dir"]
-            if "containerlab_dir" in hostvars[first_sim_node]:
-                containerlab_dir = hostvars[first_sim_node]["containerlab_dir"]
-            else:
-                containerlab_dir = inventory_dir + "/intended/containerlab/"
-            if "containerlab_add_mgmt_links" in hostvars[first_sim_node]:
-                containerlab_add_mgmt_links = hostvars[first_sim_node]["containerlab_add_mgmt_links"]
-            else:
-                containerlab_add_mgmt_links = []
+            
+            sv = hostvars[first_sim_node]
+            
+            inventory_dir = sv.get("sim_inventory_dir_override", hostvars[first_sim_node]["inventory_dir"])
+            role_path = sv.get("playbook_dir_override", os.path.dirname(os.path.realpath(__file__)) + '/..')
+            
+            sim_env = sv.get("sim_env", "clab")
+            sim_include_avd_external_nodes = sv.get("sim_include_avd_external_nodes", False)
+            sim_external_nodes_map = sv.get("sim_external_nodes_map", {})
+            sim_external_node_one_container = sv.get("sim_external_node_one_container", False)
+            sim_ceos_version = sv.get("sim_ceos_version", "ceos:latest")
+            sim_topology_file_name = sv.get("sim_topology_file_name", "topology")
+            sim_configs_dir = sv.get("sim_configs_dir", str(inventory_dir) + "/intended/configs/")
+            sim_ztp = sv.get("sim_ztp", False)
+            sim_ztp_folder = sv.get("sim_ztp_folder", str(inventory_dir) + "/ztp/dhcp/")
+            sim_dir = sv.get("sim_dir", str(inventory_dir) + "/intended/simulation/")
+            
+            containerlab_custom_interface_mapping = sv.get("containerlab_custom_interface_mapping", False)
+            containerlab_custom_interface_mapping_same_number = sv.get("containerlab_custom_interface_mapping_same_number", False)
+            containerlab_serial_sysmac = sv.get("containerlab_serial_sysmac", False)
+            containerlab_vxlan_base = sv.get("containerlab_vxlan_base", 100)
+            containerlab_enforce_startup_config = sv.get("containerlab_enforce_startup_config", False)
+            containerlab_deploy_startup_batches = sv.get("containerlab_deploy_startup_batches", 20)
+            containerlab_labname = sv.get("containerlab_labname", "AVD")
+            containerlab_prefix = sv.get("containerlab_prefix", "__lab-name")
+            containerlab_onboard_to_cvp_token = sv.get("containerlab_onboard_to_cvp_token", None)
+            containerlab_mgmt_network_name = sv.get("containerlab_mgmt_network_name", "MGMT")
+            containerlab_mgmt_network = sv.get("containerlab_mgmt_network", None)
+            containerlab_linux_kind_bind_dir = sv.get("containerlab_linux_kind_bind_dir", None)
+            containerlab_add_mgmt_links = sv.get("containerlab_add_mgmt_links", [])
         
         # If sim_env not clab only one simulation node is possible, ex. for ACT. The first node will be choosen
         if sim_env != "clab":
@@ -267,7 +222,7 @@ class ActionModule(ActionBase):
             
             # Ignore switches which are not deployed
             if "is_deployed" in hostvars[switch] and hostvars[switch]["is_deployed"] == False:
-                    continue
+                continue
 
             # if there are more than 1 clab host defined, create a list on which host which switch will run on
             if host_count > 1:
@@ -317,7 +272,7 @@ class ActionModule(ActionBase):
                         connection = {"loc_switch":switch, "loc_int":loc_int, "peer_name":eth["peer"], "peer_int":peer_int}
 
                         # Check if connection is not in the connections list already
-                        if not self.dedup_connection(avd_connections, connection):
+                        if not self._is_reverse_connection_present(avd_connections, connection):
                             if eth["peer"] in inventory:
                                 # Connections between AVD defined nodes
                                 avd_connections.append(connection)            
@@ -361,7 +316,6 @@ class ActionModule(ActionBase):
         # Additional containerlab mgmt connection defined in vars of SIMULATION Host                         
         for element in containerlab_add_mgmt_links:
             tmp_conn = {"loc_switch":element["node"], "loc_int":element["intf"], "peer_name":"mgmt-net", "peer_int":element["node"]+"-"+element["intf"]}
-            # print (tmp_conn)
             ext_connections.append(tmp_conn)
 
         # Distribute the external nodes to the simulation hosts afterwards                        
@@ -389,11 +343,11 @@ class ActionModule(ActionBase):
                 if connection["loc_switch"] in inventory:
                     mod_loc_int = switch_intf_mapping_dict[connection["loc_switch"]][connection["loc_int"]]
                 else:
-                    mod_loc_int = mod_loc_int.split(".")[0].replace("Ethernet","eth").replace("/","_")
+                    mod_loc_int = self._eos_intf_to_clab(mod_loc_int)
                 if connection["peer_name"] in inventory:
                     mod_peer_int = switch_intf_mapping_dict[connection["peer_name"]][connection["peer_int"]]
                 else:
-                    mod_peer_int = mod_peer_int.split(".")[0].replace("Ethernet","eth").replace("/","_")
+                    mod_peer_int = self._eos_intf_to_clab(mod_peer_int)
 
                 modified_connection = {"loc_switch":connection["loc_switch"], "loc_int":mod_loc_int,"peer_name":connection["peer_name"], "peer_int":mod_peer_int}
                 modified_connections.append(modified_connection)
@@ -401,7 +355,7 @@ class ActionModule(ActionBase):
         else:
             modified_connections = connections
         
-        vxlan_count = vxlan_base
+        vxlan_count = containerlab_vxlan_base
         for sim_node in all_sim_nodes:
 
             for node in distributed_nodes[sim_node]:
@@ -437,7 +391,6 @@ class ActionModule(ActionBase):
         
         # Generate the intf mapping files if needed
         mapping_switch_mapping_dict = {}
-        mapping_switch_all = {}
         if containerlab_custom_interface_mapping:
             first_switch = True
             for switch in switch_intf_mapping_dict:   
@@ -470,13 +423,13 @@ class ActionModule(ActionBase):
         if sim_env == "clab":
             nodes_dict = self.create_clab_topology_nodes(distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches,
                              containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, inventory, sim_ztp, sim_ztp_folder)
-            links_dict = self.create_clab_topology_links(sim_connections, containerlab_custom_interface_mapping, switch_intf_mapping_dict, inventory)
+            links_dict = self.create_clab_topology_links(sim_connections)
              
             
             for node in distributed_nodes:
                 # Create the CVP onboarding token if it is defined
                 if containerlab_onboard_to_cvp_token is not None:
-                    cvp_token_filename = containerlab_dir+node+"_containerlab_onboarding_token"
+                    cvp_token_filename = sim_dir+node+"_containerlab_onboarding_token"
                     os.makedirs(os.path.dirname(cvp_token_filename), exist_ok=True)
                     with open(cvp_token_filename, "w") as fh:
                         fh.write(str(containerlab_onboard_to_cvp_token))
@@ -495,7 +448,7 @@ class ActionModule(ActionBase):
                     src = Template(f.read())
                     result = src.substitute(topo_substitute)
                 
-                filename = containerlab_dir+node+"_"+sim_topology_file_name+".yml"
+                filename = sim_dir+node+"_"+sim_topology_file_name+".clab.yml"
                 os.makedirs(os.path.dirname(filename), exist_ok=True)
                 with open(filename, "w") as fh:
                     fh.write(result)
@@ -509,7 +462,7 @@ class ActionModule(ActionBase):
                         src = Template(f.read())
                         vxlan_script_result = src.substitute(vxlan_script_substitute)
 
-                    vxlan_script_filename = containerlab_dir+node+"_vxlan_commands.sh"
+                    vxlan_script_filename = sim_dir+node+"_vxlan_commands.sh"
                     os.makedirs(os.path.dirname(vxlan_script_filename), exist_ok=True)
                     with open(vxlan_script_filename, "w") as fh:
                         fh.write(vxlan_script_result)
@@ -527,28 +480,28 @@ class ActionModule(ActionBase):
                         src = Template(f.read())
                         vxlan_delete_script_result = src.substitute(vxlan_delete_script_substitute)
 
-                    vxlan_delete_script_filename = containerlab_dir+node+"_vxlan_interface_delete.sh"
+                    vxlan_delete_script_filename = sim_dir+node+"_vxlan_interface_delete.sh"
                     os.makedirs(os.path.dirname(vxlan_delete_script_filename), exist_ok=True)
                     with open(vxlan_delete_script_filename, "w") as fh:
                         fh.write(vxlan_delete_script_result)
                         
                     
                 # Create config and mapping directories for each simulation nodes and put the needed files into these directories
-                os.makedirs(os.path.dirname(containerlab_dir+node+"_configs/"), exist_ok=True)
+                os.makedirs(os.path.dirname(sim_dir+node+"_configs/"), exist_ok=True)
                 
                 if containerlab_custom_interface_mapping or containerlab_serial_sysmac:
-                    os.makedirs(os.path.dirname(containerlab_dir+node+"_mappings/"), exist_ok=True)
+                    os.makedirs(os.path.dirname(sim_dir+node+"_mappings/"), exist_ok=True)
                                
                 # Copy config files and create mapping files per simulation node
                 for switch in distributed_nodes[node]:
                     if switch in hostvars:
                         orig_config = sim_configs_dir+switch+".cfg"
-                        copy_config = containerlab_dir+node+"_configs/"+switch+".cfg"
+                        copy_config = sim_dir+node+"_configs/"+switch+".cfg"
                         if os.path.exists(orig_config):
                             shutil.copy(orig_config, copy_config)
                     
                     if containerlab_custom_interface_mapping and switch in inventory:
-                        filename = containerlab_dir+node+"_mappings/"+switch+".json"
+                        filename = sim_dir+node+"_mappings/"+switch+".json"
                         with open(filename, 'w') as file:
                             json_string = json.dumps(mapping_switch_mapping_dict[switch], sort_keys=True, indent=4)
                             file.write(json_string)
@@ -557,7 +510,7 @@ class ActionModule(ActionBase):
                     if containerlab_serial_sysmac:
                         if switch in hostvars:
                             if "serial_number" in hostvars[switch] or ("metadata" in hostvars[switch] and "serial_number" in hostvars[switch]["metadata"]) or ("metadata" in hostvars[switch] and "system_mac_address" in hostvars[switch]["metadata"]):
-                                filename = containerlab_dir+node+"_mappings/"+switch+"_ceos_config"
+                                filename = sim_dir+node+"_mappings/"+switch+"_ceos_config"
                                 with open(filename, 'w') as file:
                                     if "serial_number" in hostvars[switch]:
                                         file.write("SERIALNUMBER="+hostvars[switch]["serial_number"])
@@ -570,26 +523,26 @@ class ActionModule(ActionBase):
             # Package all files needed for each simulation host
             for node in distributed_nodes:
                 filenames = []
-                for file_name in glob.glob(containerlab_dir+node+"*"):
+                for file_name in glob.glob(sim_dir+node+"*"):
                     if os.path.isfile(file_name):
                         filenames.append(file_name)
-                folders = glob.glob(containerlab_dir+node+"*/")
-                os.makedirs(os.path.dirname(containerlab_dir+node+"/"), exist_ok=True)
+                folders = glob.glob(sim_dir+node+"*/")
+                os.makedirs(os.path.dirname(sim_dir+node+"/"), exist_ok=True)
                 for filename in filenames:
-                    shutil.copy(filename, containerlab_dir+node+"/")
+                    shutil.copy(filename, sim_dir+node+"/")
                 for folder in folders:
-                    shutil.copytree(folder, containerlab_dir+node+"/"+folder.split("/")[-2])
+                    shutil.copytree(folder, sim_dir+node+"/"+folder.split("/")[-2])
                 # Copy the bind directory for endpoints of kind linux if defined
                 if containerlab_linux_kind_bind_dir is not None:
                     bind_path = inventory_dir + "/" + containerlab_linux_kind_bind_dir
                     if os.path.exists(bind_path):
-                        shutil.copytree(bind_path, containerlab_dir+node+"/"+containerlab_linux_kind_bind_dir)
-                shutil.make_archive(containerlab_dir+node+"_tmp_containerlab_archive", 'gztar', containerlab_dir+node)
+                        shutil.copytree(bind_path, sim_dir+node+"/"+containerlab_linux_kind_bind_dir)
+                shutil.make_archive(sim_dir+node+"_tmp_containerlab_archive", 'gztar', sim_dir+node)
                 
                 # Cleanup temporary files
-                shutil.rmtree(os.path.dirname(containerlab_dir+node+"/"))
-                shutil.rmtree(os.path.dirname(containerlab_dir+node+"_configs/"))
+                shutil.rmtree(os.path.dirname(sim_dir+node+"/"))
+                shutil.rmtree(os.path.dirname(sim_dir+node+"_configs/"))
                 if containerlab_custom_interface_mapping:
-                    shutil.rmtree(os.path.dirname(containerlab_dir+node+"_mappings/"))
+                    shutil.rmtree(os.path.dirname(sim_dir+node+"_mappings/"))
 
         return dict(ansible_facts=dict(ret))
