@@ -100,7 +100,9 @@ class ActionModule(ActionBase):
                         if "bind" in hostvars[node]["containerlab"]:
                             node_string +=  "        - "+str(hostvars[node]["containerlab"]["bind"])+"\n"
                         else:
-                            node_string += "      "+str(hostvars[node]["containerlab"])+"\n"
+                            lines = str(hostvars[node]["containerlab"]).splitlines()
+                            for line in lines:
+                                node_string += "      "+str(line)+"\n"
                             
                 elif node_hostvars_exist and kind in ["linux"]:
                     lines = str(hostvars[node]["clab_vars"]).splitlines()
