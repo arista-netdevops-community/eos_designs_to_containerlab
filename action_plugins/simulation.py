@@ -96,10 +96,11 @@ class ActionModule(ActionBase):
                         if "serial_number" in hostvars[node] or ("metadata" in hostvars[node] and "serial_number" in hostvars[node]["metadata"]) or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
                             node_string += "        - "+distributed_node+"_mappings/"+node+"_ceos_config:/mnt/flash/ceos-config:ro\n"
                     if containerlab_set_platform:
+                        node_string += "        - "+distributed_node+"_mappings/"+node+"-platform:/mnt/flash/"+node+"-platform:ro\n"
                         if "platform" in hostvars[node] or ("metadata" in hostvars[node] and "platform" in hostvars[node]["metadata"]):
                             node_string += "      exec:\n"
                             node_string += "        - bash\n"
-                            node_string += "        - bash -c \"echo -e 'cd /ar/Sysdb/hardware/entmib/fixedSystem\\\\n_.modelName=\"\\\""+hostvars[node]["metadata"]["platform"]+"\"\\\"' | python3 -m Acons Sysdb\"\n"
+                            node_string += "        - bash -c \"echo -e '* * * * * bash /mnt/flash/"+node+"-platform 2>/dev/null' | crontab\"\n"
                     if "containerlab" in hostvars[node]:
                         if "bind" in hostvars[node]["containerlab"]:
                             node_string +=  "        - "+str(hostvars[node]["containerlab"]["bind"])+"\n"
@@ -524,7 +525,15 @@ class ActionModule(ActionBase):
                                     if "metadata" in hostvars[switch]:
                                         if "system_mac_address" in hostvars[switch]["metadata"]:
                                             file.write("\nSYSTEMMACADDR="+hostvars[switch]["metadata"]["system_mac_address" ])
-                
+                    
+                    # Create the file for platform mapping which can be triggered as script via crontab
+                    if containerlab_set_platform:
+                        if switch in hostvars:
+                            if "platform" in hostvars[switch] or ("metadata" in hostvars[switch] and "platform" in hostvars[switch]["metadata"]):
+                                filename = sim_dir+node+"_mappings/"+switch+"-platform"
+                                with open(filename, 'w') as file:
+                                    file.write("bash -c \"echo -e 'cd /ar/Sysdb/hardware/entmib/fixedSystem\\\\n_.modelName=\"\\\""+hostvars[switch]["metadata"]["platform"]+"\"\\\"' | python3 -m Acons Sysdb\"\n")
+
             # Package all files needed for each simulation host
             for node in distributed_nodes:
                 filenames = []
