@@ -96,8 +96,8 @@ class ActionModule(ActionBase):
                         if "serial_number" in hostvars[node] or ("metadata" in hostvars[node] and "serial_number" in hostvars[node]["metadata"]) or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
                             node_string += "        - "+distributed_node+"_mappings/"+node+"_ceos_config:/mnt/flash/ceos-config:ro\n"
                     if containerlab_set_platform:
-                        node_string += "        - "+distributed_node+"_mappings/"+node+"-platform:/mnt/flash/"+node+"-platform:ro\n"
                         if "platform" in hostvars[node] or ("metadata" in hostvars[node] and "platform" in hostvars[node]["metadata"]):
+                            node_string += "        - "+distributed_node+"_mappings/"+node+"-platform:/mnt/flash/"+node+"-platform:ro\n"
                             node_string += "      exec:\n"
                             node_string += "        - bash\n"
                             node_string += "        - bash -c \"echo -e '* * * * * bash /mnt/flash/"+node+"-platform 2>/dev/null' | crontab\"\n"
