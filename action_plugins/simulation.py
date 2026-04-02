@@ -43,7 +43,7 @@ class ActionModule(ActionBase):
         
         
     def create_clab_topology_nodes(self, distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches,
-                             containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, inventory, sim_ztp, sim_ztp_folder) -> dict:
+                             containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, containerlab_set_platform, inventory, sim_ztp, sim_ztp_folder) -> dict:
         nodes_dict = {}
         # Create the nodes for Clab topology file
         for distributed_node in distributed_nodes:  
@@ -92,10 +92,14 @@ class ActionModule(ActionBase):
                         node_string += "        - "+distributed_node+"_mappings/"+node+".json:/mnt/flash/EosIntfMapping.json:ro\n"
                     if containerlab_onboard_to_cvp_token is not None and not sim_ztp:
                         node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/token:ro\n"
-                    if containerlab_serial_sysmac and (kind in ["ceos","veos"]):
+                    if containerlab_serial_sysmac:
                         if "serial_number" in hostvars[node] or ("metadata" in hostvars[node] and "serial_number" in hostvars[node]["metadata"]) or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
                             node_string += "        - "+distributed_node+"_mappings/"+node+"_ceos_config:/mnt/flash/ceos-config:ro\n"
-                    
+                    if containerlab_set_platform:
+                        if "platform" in hostvars[node] or ("metadata" in hostvars[node] and "platform" in hostvars[node]["metadata"]):
+                            node_string += "      exec:\n"
+                            node_string += "        - bash\n"
+                            node_string += "        - bash -c \"echo -e 'cd /ar/Sysdb/hardware/entmib/fixedSystem\\\\n_.modelName=\"\\\""+hostvars[node]["metadata"]["platform"]+"\"\\\"' | python3 -m Acons Sysdb\"\n"
                     if "containerlab" in hostvars[node]:
                         if "bind" in hostvars[node]["containerlab"]:
                             node_string +=  "        - "+str(hostvars[node]["containerlab"]["bind"])+"\n"
@@ -185,6 +189,7 @@ class ActionModule(ActionBase):
             containerlab_custom_interface_mapping = sv.get("containerlab_custom_interface_mapping", False)
             containerlab_custom_interface_mapping_same_number = sv.get("containerlab_custom_interface_mapping_same_number", False)
             containerlab_serial_sysmac = sv.get("containerlab_serial_sysmac", False)
+            containerlab_set_platform = sv.get("containerlab_set_platform", False)
             containerlab_vxlan_base = sv.get("containerlab_vxlan_base", 100)
             containerlab_enforce_startup_config = sv.get("containerlab_enforce_startup_config", False)
             containerlab_deploy_startup_batches = sv.get("containerlab_deploy_startup_batches", 20)
@@ -422,7 +427,7 @@ class ActionModule(ActionBase):
         links_dict = {}
         if sim_env == "clab":
             nodes_dict = self.create_clab_topology_nodes(distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches,
-                             containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, inventory, sim_ztp, sim_ztp_folder)
+                             containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, containerlab_set_platform, inventory, sim_ztp, sim_ztp_folder)
             links_dict = self.create_clab_topology_links(sim_connections)
              
             
