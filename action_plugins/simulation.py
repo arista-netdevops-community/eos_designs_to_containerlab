@@ -331,12 +331,12 @@ class ActionModule(ActionBase):
         for element in containerlab_add_mgmt_links:
             intf = element["intf"]
             if containerlab_custom_interface_mapping:
-                intf = str((element["intf"].split("."))[0]).replace("Ethernet","").replace("/","")
+                intf = str((element["intf"].split("."))[0]).replace("Ethernet","").replace("/","_")
             tmp_conn = {"loc_switch":element["node"], "loc_int":element["intf"], "peer_name":"mgmt-net", "peer_int":element["node"]+"-eth"+intf}
             ext_connections.append(tmp_conn)
             # create EOS interface to linux eth mapping if needed
             if containerlab_custom_interface_mapping:
-                eos_intf_number = str((element["intf"].split("."))[0]).replace("Ethernet","").replace("/","")
+                eos_intf_number = str((element["intf"].split("."))[0]).replace("Ethernet","").replace("/","_")
                 tmp_intf_mapping = {str((element["intf"].split("."))[0]):"eth"+str(eos_intf_number)}
                 switch_intf_mapping_dict[element["node"]].update(tmp_intf_mapping)
 
