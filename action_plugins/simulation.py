@@ -196,7 +196,7 @@ class ActionModule(ActionBase):
             sim_dir = sv.get("sim_dir", str(inventory_dir) + "/intended/simulation/")
             
             containerlab_custom_interface_mapping = sv.get("containerlab_custom_interface_mapping", False)
-            containerlab_custom_interface_mapping_same_number = sv.get("containerlab_custom_interface_mapping_same_number", False)
+            containerlab_custom_interface_mapping_same_number = sv.get("containerlab_custom_interface_mapping_same_number", True)
             containerlab_serial_sysmac = sv.get("containerlab_serial_sysmac", False)
             containerlab_set_platform = sv.get("containerlab_set_platform", False)
             containerlab_vxlan_base = sv.get("containerlab_vxlan_base", 100)
@@ -267,7 +267,7 @@ class ActionModule(ActionBase):
                         # create EOS interface to linux eth mapping if needed
                         if containerlab_custom_interface_mapping:
                             if containerlab_custom_interface_mapping_same_number:
-                                eos_intf_number = str((eth["name"].split("."))[0]).replace("Ethernet","").replace("/","")
+                                eos_intf_number = str((eth["name"].split("."))[0]).replace("Ethernet","").replace("/","_")
                                 tmp_intf_mapping = {str((eth["name"].split("."))[0]):"eth"+str(eos_intf_number)}
                                 switch_intf_mapping_dict[switch].update(tmp_intf_mapping)
                             else:    
