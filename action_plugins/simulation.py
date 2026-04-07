@@ -423,7 +423,7 @@ class ActionModule(ActionBase):
                     first_entry = True
                     for mgmt_int in hostvars[switch]["management_interfaces"]:
                       if first_entry:
-                          if "type" in mgmt_int and "Vlan" not in mgmt_int["name"]:
+                          if "type" in mgmt_int and "Vlan" not in mgmt_int["name"] and "Ethernet" not in mgmt_int["name"]:
                             if mgmt_int["type"] == 'oob':
                                 ma_mapping_switch.update({ 'eth0':mgmt_int["name"] })
                                 first_entry = False
