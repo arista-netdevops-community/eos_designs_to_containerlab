@@ -68,6 +68,13 @@ class ActionModule(ActionBase):
                 
                 if node_hostvars_exist and kind in ["ceos","veos"]:
                     mgmt_ipv4 = ""
+                    node_sim_ztp = sim_ztp
+                    if "containerlab" in hostvars[node]:
+                        lines = str(hostvars[node]["containerlab"]).splitlines()
+                        for line in lines:
+                            if "sim_ztp: disable" in line:
+                                node_sim_ztp = False
+
                     if "management_interfaces" in hostvars[node]:
                         oob_int = next(
                             (m for m in hostvars[node]["management_interfaces"]
@@ -77,13 +84,7 @@ class ActionModule(ActionBase):
                         mgmt_ipv4 = oob_int["ip_address"].split("/")[0] if oob_int else ""
                     if mgmt_ipv4 != "":
                         node_string += "      mgmt-ipv4: "+mgmt_ipv4+"\n"
-                    if "containerlab" in hostvars[node]:
-                        lines = str(hostvars[node]["containerlab"]).splitlines()
-                        for line in lines:
-                            if "sim_ztp: disable" not in line:
-                                # Use actual configs
-                                node_string += "      startup-config: "+distributed_node+"_configs/"+node+".cfg\n"
-                    elif sim_ztp:
+                    if node_sim_ztp:
                         # Use /dev/null to enable ZTP
                         node_string += "      startup-config: /dev/null\n"
                     else:
@@ -96,7 +97,7 @@ class ActionModule(ActionBase):
                         node_string += "      binds:\n"
                     if containerlab_custom_interface_mapping and node in inventory:
                         node_string += "        - "+distributed_node+"_mappings/"+node+".json:/mnt/flash/EosIntfMapping.json:ro\n"
-                    if containerlab_onboard_to_cvp_token is not None and not sim_ztp:
+                    if containerlab_onboard_to_cvp_token is not None and not node_sim_ztp:
                         node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/token:ro\n"
                     if containerlab_serial_sysmac:
                         if "serial_number" in hostvars[node] or ("metadata" in hostvars[node] and "serial_number" in hostvars[node]["metadata"]) or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
