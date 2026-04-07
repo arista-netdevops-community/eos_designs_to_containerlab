@@ -76,8 +76,14 @@ class ActionModule(ActionBase):
                         )
                         mgmt_ipv4 = oob_int["ip_address"].split("/")[0] if oob_int else ""
                     if mgmt_ipv4 != "":
-                        node_string += "      mgmt-ipv4: "+mgmt_ipv4+"\n" 
-                    if sim_ztp:
+                        node_string += "      mgmt-ipv4: "+mgmt_ipv4+"\n"
+                    if "containerlab" in hostvars[node]:
+                        lines = str(hostvars[node]["containerlab"]).splitlines()
+                        for line in lines:
+                            if "sim_ztp: disable" not in line:
+                                # Use actual configs
+                                node_string += "      startup-config: "+distributed_node+"_configs/"+node+".cfg\n"
+                    elif sim_ztp:
                         # Use /dev/null to enable ZTP
                         node_string += "      startup-config: /dev/null\n"
                     else:
@@ -107,7 +113,8 @@ class ActionModule(ActionBase):
                         else:
                             lines = str(hostvars[node]["containerlab"]).splitlines()
                             for line in lines:
-                                node_string += "      "+str(line)+"\n"
+                                if "sim_ztp" not in line:
+                                    node_string += "      "+str(line)+"\n"
                             
                 elif node_hostvars_exist and kind in ["linux"]:
                     lines = str(hostvars[node]["clab_vars"]).splitlines()
@@ -323,6 +330,12 @@ class ActionModule(ActionBase):
         for element in containerlab_add_mgmt_links:
             tmp_conn = {"loc_switch":element["node"], "loc_int":element["intf"], "peer_name":"mgmt-net", "peer_int":element["node"]+"-"+element["intf"]}
             ext_connections.append(tmp_conn)
+            # create EOS interface to linux eth mapping if needed
+            if containerlab_custom_interface_mapping:
+                eos_intf_number = str((element["intf"].split("."))[0]).replace("Ethernet","").replace("/","")
+                tmp_intf_mapping = {str((element["intf"].split("."))[0]):"eth"+str(eos_intf_number)}
+                switch_intf_mapping_dict[element["node"]].update(tmp_intf_mapping)
+
 
         # Distribute the external nodes to the simulation hosts afterwards                        
         if sim_include_avd_external_nodes: 
@@ -339,7 +352,7 @@ class ActionModule(ActionBase):
         connections = avd_connections
         if sim_include_avd_external_nodes:
             connections = avd_connections + ext_connections
-        
+
         # set linux interface if clab intf mapping is set
         modified_connections = []
         if containerlab_custom_interface_mapping and sim_env == "clab":
