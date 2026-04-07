@@ -328,7 +328,10 @@ class ActionModule(ActionBase):
 
         # Additional containerlab mgmt connection defined in vars of SIMULATION Host                         
         for element in containerlab_add_mgmt_links:
-            tmp_conn = {"loc_switch":element["node"], "loc_int":element["intf"], "peer_name":"mgmt-net", "peer_int":element["node"]+"-"+element["intf"]}
+            intf = element["intf"]
+            if containerlab_custom_interface_mapping:
+                intf = str((element["intf"].split("."))[0]).replace("Ethernet","").replace("/","")
+            tmp_conn = {"loc_switch":element["node"], "loc_int":element["intf"], "peer_name":"mgmt-net", "peer_int":element["node"]+"-eth"+intf}
             ext_connections.append(tmp_conn)
             # create EOS interface to linux eth mapping if needed
             if containerlab_custom_interface_mapping:
