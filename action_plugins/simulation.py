@@ -338,6 +338,8 @@ class ActionModule(ActionBase):
             if containerlab_custom_interface_mapping:
                 eos_intf_number = str((element["intf"].split("."))[0]).replace("Ethernet","").replace("/","_")
                 tmp_intf_mapping = {str((element["intf"].split("."))[0]):"eth"+str(eos_intf_number)}
+                if element["node"] not in switch_intf_mapping_dict:
+                    switch_intf_mapping_dict[element["node"]] = {}
                 switch_intf_mapping_dict[element["node"]].update(tmp_intf_mapping)
 
 
