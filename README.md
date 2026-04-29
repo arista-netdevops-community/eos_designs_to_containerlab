@@ -82,6 +82,8 @@ subnet 172.16.1.0 netmask 255.255.255.0 {
 - `containerlab_deploy_on_hosts:` Copy the topology file and other needed files to the containerlab hosts and run the lab. If set to false the topology files and other needed files will only be created in the intended/ folder. (default: true)
 - `containerlab_deploy_startup_batches:` Depending on your containerlab host resources you might want to limit the amount of containers started in parallel. This option uses the containerlab option startup-delay and the delay is set to 300 seconds between the batches. (default: 20)
 - `containerlab_endpoint_bind_dir:` In case the connected endpoints are of the kind 'linux' you can map a directory to an endpoint if needed. (default: None)
+- `containerlab_deploy_local:` Is meant if the lab is run on localhost and ssh is not to be use (ansible_connection: local). It directly uses the simulation directory within the intended directory from AVD. (default: False)
+- `containerlab_ceos_copy_to_flash:` If you are using a MAC with an ARM chip and Docker Desktop there might be an issue with using 'binds:' in containerlab. When this option is enabled instead of the 'binds:' option the 'ceos-copy-to-flash' is used. (default: False)
 
 
 The above mentioned variables can be defined in the inventory file as shown below in the example playbook section.

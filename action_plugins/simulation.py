@@ -43,7 +43,7 @@ class ActionModule(ActionBase):
         
         
     def create_clab_topology_nodes(self, distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches, containerlab_custom_interface_mapping,
-                             containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, containerlab_set_platform, inventory, sim_ztp, sim_ztp_folder, containerlab_token_name) -> dict:
+                             containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, containerlab_set_platform, inventory, sim_ztp, sim_ztp_folder, containerlab_token_name, containerlab_ceos_copy_to_flash, sim_dir) -> dict:
         nodes_dict = {}
         # Create the nodes for Clab topology file
         for distributed_node in distributed_nodes:  
@@ -94,22 +94,50 @@ class ActionModule(ActionBase):
                         node_string += "      enforce-startup-config: true\n"
                     
                     if (kind in ["ceos","veos"]) and (containerlab_custom_interface_mapping or (containerlab_onboard_to_cvp_token is not None) or containerlab_serial_sysmac):
-                        node_string += "      binds:\n"
+                        if containerlab_ceos_copy_to_flash:
+                            node_string += "      extras:\n"
+                            node_string += "        ceos-copy-to-flash:\n"
+                        else:
+                            node_string += "      binds:\n"
+                        
                     if containerlab_custom_interface_mapping and node in inventory:
-                        node_string += "        - "+distributed_node+"_mappings/"+node+".json:/mnt/flash/EosIntfMapping.json:ro\n"
-                    if containerlab_onboard_to_cvp_token is not None and not node_sim_ztp:
+                        if containerlab_ceos_copy_to_flash:
+                            node_string += "          - "+distributed_node+"_mappings/"+node+"/EosIntfMapping.json\n"
+                        else:
+                            node_string += "        - "+distributed_node+"_mappings/"+node+".json:/mnt/flash/EosIntfMapping.json:ro\n"
+                    if containerlab_onboard_to_cvp_token is not None and not node_sim_ztp:                                    
                         if containerlab_token_name:
-                            node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/"+containerlab_token_name+":ro\n"
+                            if containerlab_ceos_copy_to_flash:
+                                os.makedirs(os.path.dirname(sim_dir+distributed_node+"_mappings/"+node+"/"), exist_ok=True)
+                                cvp_token_filename = sim_dir+distributed_node+"_mappings/"+node+"/"+containerlab_token_name
+                                with open(cvp_token_filename, "w") as fh:
+                                    fh.write(str(containerlab_onboard_to_cvp_token))
+                                node_string += "          - "+distributed_node+"_mappings/"+node+"/"+containerlab_token_name+"\n"
+                            else:
+                                node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/"+containerlab_token_name+":ro\n"
                         else:
                             if "daemon_terminattr" in hostvars[node] and "cvauth" in hostvars[node]["daemon_terminattr"] and "token_file" in hostvars[node]["daemon_terminattr"]["cvauth"]:
                                 containerlab_token_name = str(hostvars[node]["daemon_terminattr"]["cvauth"]["token_file"]).split("/")[-1]
-                                node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/"+containerlab_token_name+":ro\n"
+                                if containerlab_ceos_copy_to_flash:
+                                    os.makedirs(os.path.dirname(sim_dir+distributed_node+"_mappings/"+node+"/"), exist_ok=True)
+                                    cvp_token_filename = sim_dir+distributed_node+"_mappings/"+node+"/"+containerlab_token_name
+                                    with open(cvp_token_filename, "w") as fh:
+                                        fh.write(str(containerlab_onboard_to_cvp_token))
+                                    node_string += "          - "+distributed_node+"_mappings/"+node+"/"+containerlab_token_name+"\n"
+                                else:
+                                    node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/"+containerlab_token_name+":ro\n"
                     if containerlab_serial_sysmac:
                         if "serial_number" in hostvars[node] or ("metadata" in hostvars[node] and "serial_number" in hostvars[node]["metadata"]) or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
-                            node_string += "        - "+distributed_node+"_mappings/"+node+"_ceos_config:/mnt/flash/ceos-config:ro\n"
+                            if containerlab_ceos_copy_to_flash:
+                                node_string += "          - "+distributed_node+"_mappings/"+node+"/ceos_config\n"
+                            else:
+                                node_string += "        - "+distributed_node+"_mappings/"+node+"_ceos_config:/mnt/flash/ceos-config:ro\n"
                     if containerlab_set_platform:
                         if "platform" in hostvars[node] or ("metadata" in hostvars[node] and "platform" in hostvars[node]["metadata"]):
-                            node_string += "        - "+distributed_node+"_mappings/"+node+"-platform:/mnt/flash/"+node+"-platform:ro\n"
+                            if containerlab_ceos_copy_to_flash:
+                                node_string += "          - "+distributed_node+"_mappings/"+node+"/"+node+"-platform\n"
+                            else:
+                                node_string += "        - "+distributed_node+"_mappings/"+node+"-platform:/mnt/flash/"+node+"-platform:ro\n"
                             node_string += "      exec:\n"
                             node_string += "        - bash\n"
                             node_string += "        - bash -c \"echo -e '* * * * * bash /mnt/flash/"+node+"-platform 2>/dev/null' | crontab\"\n"
@@ -215,6 +243,9 @@ class ActionModule(ActionBase):
             containerlab_linux_kind_bind_dir = sv.get("containerlab_linux_kind_bind_dir", None)
             containerlab_add_mgmt_links = sv.get("containerlab_add_mgmt_links", [])
             containerlab_token_name = sv.get("containerlab_token_name", None)
+            containerlab_deploy_local = sv.get("containerlab_deploy_local", False)
+            containerlab_ceos_copy_to_flash = sv.get("containerlab_ceos_copy_to_flash", False)
+            
         
         # If sim_env not clab only one simulation node is possible, ex. for ACT. The first node will be choosen
         if sim_env != "clab":
@@ -453,7 +484,7 @@ class ActionModule(ActionBase):
         links_dict = {}
         if sim_env == "clab":
             nodes_dict = self.create_clab_topology_nodes(distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches, containerlab_custom_interface_mapping,
-                             containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, containerlab_set_platform, inventory, sim_ztp, sim_ztp_folder, containerlab_token_name)
+                             containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, containerlab_set_platform, inventory, sim_ztp, sim_ztp_folder, containerlab_token_name, containerlab_ceos_copy_to_flash, sim_dir)
             links_dict = self.create_clab_topology_links(sim_connections)
              
             
@@ -533,6 +564,9 @@ class ActionModule(ActionBase):
                     
                     if containerlab_custom_interface_mapping and switch in inventory:
                         filename = sim_dir+node+"_mappings/"+switch+".json"
+                        if containerlab_ceos_copy_to_flash:
+                            os.makedirs(os.path.dirname(sim_dir+node+"_mappings/"+switch+"/"), exist_ok=True)
+                            filename = sim_dir+node+"_mappings/"+switch+"/EosIntfMapping.json"
                         with open(filename, 'w') as file:
                             json_string = json.dumps(mapping_switch_mapping_dict[switch], sort_keys=True, indent=4)
                             file.write(json_string)
@@ -542,6 +576,9 @@ class ActionModule(ActionBase):
                         if switch in hostvars:
                             if "serial_number" in hostvars[switch] or ("metadata" in hostvars[switch] and "serial_number" in hostvars[switch]["metadata"]) or ("metadata" in hostvars[switch] and "system_mac_address" in hostvars[switch]["metadata"]):
                                 filename = sim_dir+node+"_mappings/"+switch+"_ceos_config"
+                                if containerlab_ceos_copy_to_flash:
+                                    os.makedirs(os.path.dirname(sim_dir+node+"_mappings/"+switch+"/"), exist_ok=True)
+                                    filename = sim_dir+node+"_mappings/"+switch+"/ceos_config"
                                 with open(filename, 'w') as file:
                                     if "serial_number" in hostvars[switch]:
                                         file.write("SERIALNUMBER="+hostvars[switch]["serial_number"])
@@ -556,32 +593,41 @@ class ActionModule(ActionBase):
                         if switch in hostvars:
                             if "platform" in hostvars[switch] or ("metadata" in hostvars[switch] and "platform" in hostvars[switch]["metadata"]):
                                 filename = sim_dir+node+"_mappings/"+switch+"-platform"
+                                if containerlab_ceos_copy_to_flash:
+                                    os.makedirs(os.path.dirname(sim_dir+node+"_mappings/"+switch+"/"), exist_ok=True)
+                                    filename = sim_dir+node+"_mappings/"+switch+"/"+switch+"-platform"
                                 with open(filename, 'w') as file:
                                     file.write("bash -c \"echo -e 'cd /ar/Sysdb/hardware/entmib/fixedSystem\\\\n_.modelName=\"\\\""+hostvars[switch]["metadata"]["platform"]+"\"\\\"' | python3 -m Acons Sysdb\"\n")
-
-            # Package all files needed for each simulation host
+            
             for node in distributed_nodes:
-                filenames = []
-                for file_name in glob.glob(sim_dir+node+"*"):
-                    if os.path.isfile(file_name):
-                        filenames.append(file_name)
-                folders = glob.glob(sim_dir+node+"*/")
-                os.makedirs(os.path.dirname(sim_dir+node+"/"), exist_ok=True)
-                for filename in filenames:
-                    shutil.copy(filename, sim_dir+node+"/")
-                for folder in folders:
-                    shutil.copytree(folder, sim_dir+node+"/"+folder.split("/")[-2])
                 # Copy the bind directory for endpoints of kind linux if defined
                 if containerlab_linux_kind_bind_dir is not None:
                     bind_path = inventory_dir + "/" + containerlab_linux_kind_bind_dir
                     if os.path.exists(bind_path):
-                        shutil.copytree(bind_path, sim_dir+node+"/"+containerlab_linux_kind_bind_dir)
-                shutil.make_archive(sim_dir+node+"_tmp_containerlab_archive", 'gztar', sim_dir+node)
-                
-                # Cleanup temporary files
-                shutil.rmtree(os.path.dirname(sim_dir+node+"/"))
-                shutil.rmtree(os.path.dirname(sim_dir+node+"_configs/"))
-                if containerlab_custom_interface_mapping:
-                    shutil.rmtree(os.path.dirname(sim_dir+node+"_mappings/"))
+                        if not containerlab_deploy_local:
+                            shutil.copytree(bind_path, sim_dir+node+"/"+containerlab_linux_kind_bind_dir)
+                        else:
+                            shutil.copytree(bind_path, sim_dir+containerlab_linux_kind_bind_dir)
+            
+            if not containerlab_deploy_local:
+                # Package all files needed for each simulation host if it is not run locally from the simulation directory
+                for node in distributed_nodes:
+                    filenames = []
+                    for file_name in glob.glob(sim_dir+node+"*"):
+                        if os.path.isfile(file_name):
+                            filenames.append(file_name)
+                    folders = glob.glob(sim_dir+node+"*/")
+                    os.makedirs(os.path.dirname(sim_dir+node+"/"), exist_ok=True)
+                    for filename in filenames:
+                        shutil.copy(filename, sim_dir+node+"/")
+                    for folder in folders:
+                        shutil.copytree(folder, sim_dir+node+"/"+folder.split("/")[-2])
+                    shutil.make_archive(sim_dir+node+"_tmp_containerlab_archive", 'gztar', sim_dir+node)
+                    
+                    # Cleanup temporary files
+                    shutil.rmtree(os.path.dirname(sim_dir+node+"/"))
+                    shutil.rmtree(os.path.dirname(sim_dir+node+"_configs/"))
+                    if containerlab_custom_interface_mapping:
+                        shutil.rmtree(os.path.dirname(sim_dir+node+"_mappings/"))
 
         return dict(ansible_facts=dict(ret))
