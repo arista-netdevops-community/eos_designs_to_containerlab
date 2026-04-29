@@ -42,8 +42,8 @@ class ActionModule(ActionBase):
             
         
         
-    def create_clab_topology_nodes(self, distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches,
-                             containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, containerlab_set_platform, inventory, sim_ztp, sim_ztp_folder) -> dict:
+    def create_clab_topology_nodes(self, distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches, containerlab_custom_interface_mapping,
+                             containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, containerlab_set_platform, inventory, sim_ztp, sim_ztp_folder, containerlab_token_name) -> dict:
         nodes_dict = {}
         # Create the nodes for Clab topology file
         for distributed_node in distributed_nodes:  
@@ -98,7 +98,7 @@ class ActionModule(ActionBase):
                     if containerlab_custom_interface_mapping and node in inventory:
                         node_string += "        - "+distributed_node+"_mappings/"+node+".json:/mnt/flash/EosIntfMapping.json:ro\n"
                     if containerlab_onboard_to_cvp_token is not None and not node_sim_ztp:
-                        node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/token:ro\n"
+                        node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/"+containerlab_token_name+":ro\n"
                     if containerlab_serial_sysmac:
                         if "serial_number" in hostvars[node] or ("metadata" in hostvars[node] and "serial_number" in hostvars[node]["metadata"]) or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
                             node_string += "        - "+distributed_node+"_mappings/"+node+"_ceos_config:/mnt/flash/ceos-config:ro\n"
@@ -209,6 +209,7 @@ class ActionModule(ActionBase):
             containerlab_mgmt_network = sv.get("containerlab_mgmt_network", None)
             containerlab_linux_kind_bind_dir = sv.get("containerlab_linux_kind_bind_dir", None)
             containerlab_add_mgmt_links = sv.get("containerlab_add_mgmt_links", [])
+            containerlab_token_name = sv.get("containerlab_token_name", "token")
         
         # If sim_env not clab only one simulation node is possible, ex. for ACT. The first node will be choosen
         if sim_env != "clab":
@@ -446,8 +447,8 @@ class ActionModule(ActionBase):
         nodes_dict = {}
         links_dict = {}
         if sim_env == "clab":
-            nodes_dict = self.create_clab_topology_nodes(distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches,
-                             containerlab_custom_interface_mapping, containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, containerlab_set_platform, inventory, sim_ztp, sim_ztp_folder)
+            nodes_dict = self.create_clab_topology_nodes(distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches, containerlab_custom_interface_mapping,
+                             containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, containerlab_set_platform, inventory, sim_ztp, sim_ztp_folder, containerlab_token_name)
             links_dict = self.create_clab_topology_links(sim_connections)
              
             
