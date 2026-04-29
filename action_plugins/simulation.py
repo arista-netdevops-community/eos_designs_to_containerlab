@@ -129,7 +129,7 @@ class ActionModule(ActionBase):
                     if containerlab_serial_sysmac:
                         if "serial_number" in hostvars[node] or ("metadata" in hostvars[node] and "serial_number" in hostvars[node]["metadata"]) or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
                             if containerlab_ceos_copy_to_flash:
-                                node_string += "          - "+distributed_node+"_mappings/"+node+"/ceos_config\n"
+                                node_string += "          - "+distributed_node+"_mappings/"+node+"/ceos-config\n"
                             else:
                                 node_string += "        - "+distributed_node+"_mappings/"+node+"_ceos_config:/mnt/flash/ceos-config:ro\n"
                     if containerlab_set_platform:
@@ -143,6 +143,8 @@ class ActionModule(ActionBase):
                             node_string += "        - bash -c \"echo -e '* * * * * bash /mnt/flash/"+node+"-platform 2>/dev/null' | crontab\"\n"
                     if "containerlab" in hostvars[node]:
                         if "bind" in hostvars[node]["containerlab"]:
+                            if containerlab_ceos_copy_to_flash:
+                                node_string += "      binds:\n"
                             node_string +=  "        - "+str(hostvars[node]["containerlab"]["bind"])+"\n"
                         else:
                             lines = str(hostvars[node]["containerlab"]).splitlines()
@@ -578,7 +580,7 @@ class ActionModule(ActionBase):
                                 filename = sim_dir+node+"_mappings/"+switch+"_ceos_config"
                                 if containerlab_ceos_copy_to_flash:
                                     os.makedirs(os.path.dirname(sim_dir+node+"_mappings/"+switch+"/"), exist_ok=True)
-                                    filename = sim_dir+node+"_mappings/"+switch+"/ceos_config"
+                                    filename = sim_dir+node+"_mappings/"+switch+"/ceos-config"
                                 with open(filename, 'w') as file:
                                     if "serial_number" in hostvars[switch]:
                                         file.write("SERIALNUMBER="+hostvars[switch]["serial_number"])
