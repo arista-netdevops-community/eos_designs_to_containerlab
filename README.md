@@ -78,9 +78,11 @@ subnet 172.16.1.0 netmask 255.255.255.0 {
 - `containerlab_skip_post_deploy`: Skip containerlab post deploy actions. Supported in containerlab version 0.24 and later. (default: false)
 - `containerlab_max_workers`: Limit the amount of concurrent workers that create containers or wire virtual links. (default: equals the number of nodes/links to create)
 - `containerlab_onboard_to_cvp_token:` Optional parameter to provide a CVP token to devices for registering with CVP automatically.
+- `containerlab_token_name:` Name of the file for the CVP onboarding token which is stored in /mnt/flash/. (default: "token")
 - `containerlab_deploy_on_hosts:` Copy the topology file and other needed files to the containerlab hosts and run the lab. If set to false the topology files and other needed files will only be created in the intended/ folder. (default: true)
 - `containerlab_deploy_startup_batches:` Depending on your containerlab host resources you might want to limit the amount of containers started in parallel. This option uses the containerlab option startup-delay and the delay is set to 300 seconds between the batches. (default: 20)
 - `containerlab_endpoint_bind_dir:` In case the connected endpoints are of the kind 'linux' you can map a directory to an endpoint if needed. (default: None)
+
 
 The above mentioned variables can be defined in the inventory file as shown below in the example playbook section.
 
