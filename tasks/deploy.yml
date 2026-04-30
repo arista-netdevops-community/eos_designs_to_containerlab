@@ -5,6 +5,7 @@
   ansible.builtin.setup:
     gather_subset:
       - '!all'
+  when: not (containerlab_deploy_local | default(false))
 
 - name: Check if more than one containerlab host is defined
   set_fact:
@@ -12,24 +13,31 @@
   run_once: true
   delegate_to: localhost
 
+- name: Determine containerlab working directory parent
+  set_fact:
+    clab_workdir_parent: "{% if containerlab_deploy_local | default(false) %}{{ output_dir }}{% else %}{{ ansible_facts.env.PWD }}{% endif %}"
+
+- name: Determine containerlab working directory
+  set_fact:
+    clab_workdir: "{% if containerlab_deploy_local | default(false) %}{{ containerlab_dir }}{% else %}{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}{% endif %}"
+
 - name: Check if there is already a topology file with the same name
   stat:
-    path: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}/{{inventory_hostname}}_{{ sim_topology_file_name }}.clab.yml"
+    path: "{{ clab_workdir }}/{{inventory_hostname}}_{{ sim_topology_file_name }}.clab.yml"
   register: stat_result
 
 - name: Destroy the lab using containerlab in a container
   become: true
   command: "docker run \
     --rm \
-    -it \
     --privileged \
     --network host \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v /var/run/netns:/var/run/netns \
     -v /etc/hosts:/etc/hosts \
     --pid='host' \
-    -v {{ ansible_facts.env.PWD }}:{{ ansible_facts.env.PWD }} \
-    -w {{ ansible_facts.env.PWD }}/{{ containerlab_labname }} \
+    -v {{ clab_workdir_parent }}:{{ clab_workdir_parent }} \
+    -w {{ clab_workdir }} \
     ghcr.io/srl-labs/clab clab destroy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.clab.yml --cleanup "
   when: containerlab_mode == 'container' and stat_result.stat.exists and containerlab_deploy_on_hosts
 
@@ -37,43 +45,43 @@
   become: true
   command: "clab destroy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.clab.yml --cleanup{% if containerlab_runtime is defined and containerlab_runtime != 'docker' %} --runtime {{ containerlab_runtime }}{% endif %}"
   args:
-    chdir: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
+    chdir: "{{ clab_workdir }}"
   when: containerlab_mode == 'installed' and stat_result.stat.exists and containerlab_deploy_on_hosts
 
 - name: Delete vxlan interfaces which were used by the old lab
   become: true
   command: "bash {{ inventory_hostname }}_vxlan_interface_delete.sh"
   args:
-    chdir: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
-  when: multinode and containerlab_deploy_on_hosts
+    chdir: "{{ clab_workdir }}"
+  when: multinode and containerlab_deploy_on_hosts and not (containerlab_deploy_local | default(false))
   ignore_errors: true
 
 - name: Remove containerlab directory on the containerlab host
   file:
-    path: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
+    path: "{{ clab_workdir }}"
     state: absent
   become: true
-  when: containerlab_deploy_on_hosts
+  when: containerlab_deploy_on_hosts and not (containerlab_deploy_local | default(false))
 
 - name: Create required directories on the containerlab host
   file:
-    path: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
+    path: "{{ clab_workdir }}"
     state: directory
     mode: 0775
-  when: containerlab_deploy_on_hosts
+  when: containerlab_deploy_on_hosts and not (containerlab_deploy_local | default(false))
 
 - name: Unarchive the containerlab files to the containerlab host
   unarchive:
     src: "{{ containerlab_dir }}/{{ inventory_hostname }}_tmp_containerlab_archive.tar.gz"
-    dest: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
-  when: containerlab_deploy_on_hosts
+    dest: "{{ clab_workdir }}"
+  when: containerlab_deploy_on_hosts and not (containerlab_deploy_local | default(false))
 
 - name: Delete vxlan interfaces which will be used by the new lab
   become: true
   command: "bash {{ inventory_hostname }}_vxlan_interface_delete.sh"
   args:
-    chdir: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
-  when: multinode and containerlab_deploy_on_hosts
+    chdir: "{{ clab_workdir }}"
+  when: multinode and containerlab_deploy_on_hosts and not (containerlab_deploy_local | default(false))
   ignore_errors: true
 
 - name: Creating run parameters for containerlab deploy
@@ -93,15 +101,14 @@
   become: true
   command: "docker run \
     --rm \
-    -it \
     --privileged \
     --network host \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v /var/run/netns:/var/run/netns \
     -v /etc/hosts:/etc/hosts \
     --pid='host' \
-    -v {{ ansible_facts.env.PWD }}:{{ ansible_facts.env.PWD }} \
-    -w {{ ansible_facts.env.PWD }}/{{ containerlab_labname }} \
+    -v {{ clab_workdir_parent }}:{{ clab_workdir_parent }} \
+    -w {{ clab_workdir }} \
     ghcr.io/srl-labs/clab clab deploy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.clab.yml {{ containerlab_cmd }} "
   when: containerlab_mode == 'container' and containerlab_deploy_on_hosts
 
@@ -109,28 +116,27 @@
   become: true
   command: "docker run \
     --rm \
-    -it \
     --privileged \
     --network host \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v /var/run/netns:/var/run/netns \
     -v /etc/hosts:/etc/hosts \
     --pid='host' \
-    -v {{ ansible_facts.env.PWD }}:{{ ansible_facts.env.PWD }} \
-    -w {{ ansible_facts.env.PWD }}/{{ containerlab_labname }} \
+    -v {{ clab_workdir_parent }}:{{ clab_workdir_parent }} \
+    -w {{ clab_workdir }} \
     ghcr.io/srl-labs/clab bash {{ inventory_hostname }}_vxlan_commands.sh "
-  when: multinode and containerlab_mode == 'container' and containerlab_deploy_on_hosts
+  when: multinode and containerlab_mode == 'container' and containerlab_deploy_on_hosts and not (containerlab_deploy_local | default(false))
 
 - name: Deploy the lab using installed containerlab
   become: true
   command: "clab deploy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.clab.yml {{ containerlab_cmd }} "
   args:
-    chdir: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
+    chdir: "{{ clab_workdir }}"
   when: containerlab_mode == 'installed' and containerlab_deploy_on_hosts
 
 - name: Run the containerlab vxlan commands (installed clab)
   become: true
   command: "bash {{ inventory_hostname }}_vxlan_commands.sh"
   args:
-    chdir: "{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}"
-  when: multinode and containerlab_mode == 'installed' and containerlab_deploy_on_hosts
+    chdir: "{{ clab_workdir }}"
+  when: multinode and containerlab_mode == 'installed' and containerlab_deploy_on_hosts and not (containerlab_deploy_local | default(false))

@@ -19,6 +19,7 @@ containerlab_dir: '{{ output_dir }}/{{ containerlab_dir_name }}'
 containerlab_mode: installed
 containerlab_labname: AVD
 containerlab_deploy_on_hosts: true
+containerlab_deploy_local: false
 
 # Optional containerlab runtime (only adds --runtime flag when defined and not 'docker')
 # Uncomment and set to 'podman' to use Podman backend instead of Docker
