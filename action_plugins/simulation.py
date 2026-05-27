@@ -240,6 +240,8 @@ class ActionModule(ActionBase):
             containerlab_labname = sv.get("containerlab_labname", "AVD")
             containerlab_prefix = sv.get("containerlab_prefix", "__lab-name")
             containerlab_onboard_to_cvp_token = sv.get("containerlab_onboard_to_cvp_token", None)
+            if containerlab_onboard_to_cvp_token is not None:
+              containerlab_onboard_to_cvp_token = self._templar.template(containerlab_onboard_to_cvp_token)
             containerlab_mgmt_network_name = sv.get("containerlab_mgmt_network_name", "MGMT")
             containerlab_mgmt_network = sv.get("containerlab_mgmt_network", None)
             containerlab_linux_kind_bind_dir = sv.get("containerlab_linux_kind_bind_dir", None)
