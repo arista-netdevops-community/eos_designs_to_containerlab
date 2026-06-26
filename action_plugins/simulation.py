@@ -126,6 +126,10 @@ class ActionModule(ActionBase):
                                     node_string += "          - "+distributed_node+"_mappings/"+node+"/"+containerlab_token_name+"\n"
                                 else:
                                     node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/"+containerlab_token_name+":ro\n"
+                    if "containerlab" in hostvars[node]:
+                        if "bind" in hostvars[node]["containerlab"]:
+                            if not containerlab_ceos_copy_to_flash:
+                                node_string +=  "        - "+str(hostvars[node]["containerlab"]["bind"])+"\n"
                     if containerlab_serial_sysmac:
                         if "serial_number" in hostvars[node] or ("metadata" in hostvars[node] and "serial_number" in hostvars[node]["metadata"]) or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
                             if containerlab_ceos_copy_to_flash:
@@ -145,7 +149,7 @@ class ActionModule(ActionBase):
                         if "bind" in hostvars[node]["containerlab"]:
                             if containerlab_ceos_copy_to_flash:
                                 node_string += "      binds:\n"
-                            node_string +=  "        - "+str(hostvars[node]["containerlab"]["bind"])+"\n"
+                                node_string +=  "        - "+str(hostvars[node]["containerlab"]["bind"])+"\n"
                         else:
                             lines = str(hostvars[node]["containerlab"]).splitlines()
                             for line in lines:
