@@ -2,13 +2,17 @@
 # tasks file for avd nodes
 
 - name: Remove local containerlab output directories
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
     - "{{ containerlab_dir }}"
   delegate_to: localhost
   run_once: true
+  # For a local deployment this directory contains the topology of the
+  # running lab. Keep it so the action plugin can preserve that topology for
+  # the destroy step during a re-deployment.
+  when: not (containerlab_deploy_local | default(false))
 
 - name: Include device intended structure configuration variables
   delegate_to: localhost

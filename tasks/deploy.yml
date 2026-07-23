@@ -22,9 +22,19 @@
     clab_workdir: "{% if containerlab_deploy_local | default(false) %}{{ containerlab_dir }}{% else %}{{ ansible_facts.env.PWD }}/{{ containerlab_labname }}{% endif %}"
 
 - name: Check if there is already a topology file with the same name
-  stat:
+  ansible.builtin.stat:
     path: "{{ clab_workdir }}/{{inventory_hostname}}_{{ sim_topology_file_name }}.clab.yml"
   register: stat_result
+
+- name: Check for the topology from the running local lab
+  ansible.builtin.stat:
+    path: "{{ clab_workdir }}/{{ inventory_hostname }}_{{ sim_topology_file_name }}.clab.yml.previous"
+  register: previous_topology_result
+  when: containerlab_deploy_local | default(false)
+
+- name: Determine topology file to use for lab destruction
+  ansible.builtin.set_fact:
+    clab_destroy_topology_file: "{{ inventory_hostname }}_{{ sim_topology_file_name }}.clab.yml{{ '.previous' if containerlab_deploy_local | default(false) and previous_topology_result.stat.exists else '' }}"
 
 - name: Destroy the lab using containerlab in a container
   become: true
@@ -38,15 +48,25 @@
     --pid='host' \
     -v {{ clab_workdir_parent }}:{{ clab_workdir_parent }} \
     -w {{ clab_workdir }} \
-    ghcr.io/srl-labs/clab clab destroy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.clab.yml --cleanup "
+    ghcr.io/srl-labs/clab clab destroy -t {{ clab_destroy_topology_file }} --cleanup "
   when: containerlab_mode == 'container' and stat_result.stat.exists and containerlab_deploy_on_hosts
 
 - name: Destroy the lab using installed containerlab
   become: true
-  command: "clab destroy -t {{inventory_hostname}}_{{ sim_topology_file_name }}.clab.yml --cleanup{% if containerlab_runtime is defined and containerlab_runtime != 'docker' %} --runtime {{ containerlab_runtime }}{% endif %}"
+  command: "clab destroy -t {{ clab_destroy_topology_file }} --cleanup{% if containerlab_runtime is defined and containerlab_runtime != 'docker' %} --runtime {{ containerlab_runtime }}{% endif %}"
   args:
     chdir: "{{ clab_workdir }}"
   when: containerlab_mode == 'installed' and stat_result.stat.exists and containerlab_deploy_on_hosts
+
+- name: Remove the topology backup after local lab destruction
+  ansible.builtin.file:
+    path: "{{ clab_workdir }}/{{ clab_destroy_topology_file }}"
+    state: absent
+  when:
+    - containerlab_deploy_local | default(false)
+    - previous_topology_result.stat.exists
+    - stat_result.stat.exists
+    - containerlab_deploy_on_hosts
 
 - name: Delete vxlan interfaces which were used by the old lab
   become: true
