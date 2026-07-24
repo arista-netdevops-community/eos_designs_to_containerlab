@@ -520,9 +520,7 @@ class ActionModule(ActionBase):
                 
                 filename = sim_dir+node+"_"+sim_topology_file_name+".clab.yml"
                 os.makedirs(os.path.dirname(filename), exist_ok=True)
-                # Keep the topology used by the running local lab. The deploy
-                # tasks use it to remove nodes that may no longer be present
-                # in the newly generated topology.
+                # Keep the topology because it is needed later to destroy the lab
                 if containerlab_deploy_local and os.path.exists(filename):
                     shutil.copy2(filename, f"{filename}.previous")
                 with open(filename, "w") as fh:

@@ -9,9 +9,7 @@
     - "{{ containerlab_dir }}"
   delegate_to: localhost
   run_once: true
-  # For a local deployment this directory contains the topology of the
-  # running lab. Keep it so the action plugin can preserve that topology for
-  # the destroy step during a re-deployment.
+  # For a local deployment we need to retain to destroy the lab later
   when: not (containerlab_deploy_local | default(false))
 
 - name: Include device intended structure configuration variables
