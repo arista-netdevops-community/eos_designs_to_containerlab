@@ -520,6 +520,9 @@ class ActionModule(ActionBase):
                 
                 filename = sim_dir+node+"_"+sim_topology_file_name+".clab.yml"
                 os.makedirs(os.path.dirname(filename), exist_ok=True)
+                # Keep the topology because it is needed later to destroy the lab
+                if containerlab_deploy_local and os.path.exists(filename):
+                    shutil.copy2(filename, f"{filename}.previous")
                 with open(filename, "w") as fh:
                     fh.write(result)
 
@@ -615,7 +618,7 @@ class ActionModule(ActionBase):
                         if not containerlab_deploy_local:
                             shutil.copytree(bind_path, sim_dir+node+"/"+containerlab_linux_kind_bind_dir)
                         else:
-                            shutil.copytree(bind_path, sim_dir+containerlab_linux_kind_bind_dir)
+                            shutil.copytree(bind_path, sim_dir+containerlab_linux_kind_bind_dir, dirs_exist_ok=True)
             
             if not containerlab_deploy_local:
                 # Package all files needed for each simulation host if it is not run locally from the simulation directory
