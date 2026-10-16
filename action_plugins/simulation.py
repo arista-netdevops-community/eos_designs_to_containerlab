@@ -159,7 +159,7 @@ class ActionModule(ActionBase):
                                 if "sim_ztp" not in line:
                                     node_string += "      "+str(line)+"\n"
                             
-                elif node_hostvars_exist and kind in ["linux"]:
+                elif node_hostvars_exist:
                     lines = str(hostvars[node]["clab_vars"]).splitlines()
                     for line in lines:
                         node_string += "      "+str(line)+"\n"
@@ -281,17 +281,19 @@ class ActionModule(ActionBase):
             sim_connections.update({ sim_node:{'local_con':[], 'local_vx_con':[], 'local_vx_clab_tools_cmd':[]} })
         
         for switch in inventory:
-            
             # Ignore switches which are not deployed
             if "is_deployed" in hostvars[switch] and hostvars[switch]["is_deployed"] == False:
                 continue
 
             # if there are more than 1 clab host defined, create a list on which host which switch will run on
+            kind_image = {"kind": "arista_ceos", "image":sim_ceos_version}
+            if "kind" in hostvars[switch] and "image" in hostvars[switch]:
+                kind_image = {"kind": hostvars[switch]["kind"], "image":hostvars[switch]["image"]}
             if host_count > 1:
                 position = host_distribute_counter % (host_count)
-                distributed_nodes[(list(distributed_nodes)[position])][switch] = {"kind": "arista_ceos", "image":sim_ceos_version}
+                distributed_nodes[(list(distributed_nodes)[position])][switch] = kind_image
             else:
-                distributed_nodes[(list(distributed_nodes)[0])][switch] = {"kind": "arista_ceos", "image":sim_ceos_version}
+                distributed_nodes[(list(distributed_nodes)[0])][switch] = kind_image
             host_distribute_counter += 1
 
 
@@ -299,6 +301,7 @@ class ActionModule(ActionBase):
 
                 intf_counter = 1
                 switch_intf_mapping_dict[switch] = {}
+                physical_links = set()
                 for eth in hostvars[switch]["ethernet_interfaces"]:
                     # For AVD >= 6.0 extract the metadata parts, like peer, peer_interface and peer_type
                     if "metadata" in eth:
@@ -312,10 +315,19 @@ class ActionModule(ActionBase):
                             if "is_deployed" in hostvars[eth["peer"]] and hostvars[eth["peer"]]["is_deployed"] == False:
                                 continue
                         
+                        physical_link = (
+                            self._eos_intf_to_clab(eth["name"]),
+                            eth["peer"],
+                            self._eos_intf_to_clab(eth["peer_interface"]),
+                        )
+                        if physical_link in physical_links:
+                            continue
+                        physical_links.add(physical_link)
+                        
                         # create EOS interface to linux eth mapping if needed
                         if containerlab_custom_interface_mapping:
                             if containerlab_custom_interface_mapping_same_number:
-                                eos_intf_number = str((eth["name"].split("."))[0]).replace("Ethernet","").replace("/","_")
+                                eos_intf_number = str((eth["name"].split("."))[0]).replace("Ethernet","").replace("ethernet","").replace("/","_")
                                 tmp_intf_mapping = {str((eth["name"].split("."))[0]):"eth"+str(eos_intf_number)}
                                 switch_intf_mapping_dict[switch].update(tmp_intf_mapping)
                             else:    
@@ -325,8 +337,8 @@ class ActionModule(ActionBase):
 
                         # if sim_env is 'clab' replace 'Ethernet' with 'eth' and '/' with '_'      
                         if sim_env == "clab" and not containerlab_custom_interface_mapping:
-                            loc_int = str((eth["name"].split("."))[0]).replace("Ethernet","eth").replace("/","_")
-                            peer_int = str((eth["peer_interface"].split("."))[0]).replace("Ethernet","eth").replace("/","_")
+                            loc_int = str((eth["name"].split("."))[0]).replace("Ethernet","eth").replace("ethernet","eth").replace("/","_")
+                            peer_int = str((eth["peer_interface"].split("."))[0]).replace("Ethernet","eth").replace("ethernet","eth").replace("/","_")
                         else:
                             loc_int = str((eth["name"].split("."))[0])
                             peer_int = str((eth["peer_interface"].split("."))[0])
@@ -352,15 +364,13 @@ class ActionModule(ActionBase):
                                         client_all_intf_index += 1
                                         ext_connections.append(client_all_connection)
                                     else:
-                                        if connection["peer_name"] in hostvars:
-                                            for tmp_connection in ext_connections:
-                                                if (str(connection["peer_int"]).lower() == tmp_connection["peer_int"]) and (connection["peer_name"] == tmp_connection["peer_name"]):
-                                                    connection["peer_int"] = "eth"+str(int(connection["peer_int"].split(".")[0].replace("Ethernet","eth").replace("ethernet","eth").split("eth")[1]) + 1)
-                                                else:
-                                                    connection["peer_int"] = self._eos_intf_to_clab(connection["peer_int"])
-                                            
-                                            connection["peer_int"] = str(connection["peer_int"].lower())
-                                            ext_connections.append(connection)
+                                        if not connection in ext_connections:
+                                            if connection["peer_name"] in hostvars:
+                                                connection["peer_int"] = self._eos_intf_to_clab(
+                                                    connection["peer_int"]
+                                                ).lower()
+
+                                                ext_connections.append(connection)
                                     
                                     # Add the external nodes to a set so that they can be distributed to the simulation hosts afterwards
                                     node_type = {"kind": "arista_ceos", "image":sim_ceos_version}
@@ -373,6 +383,8 @@ class ActionModule(ActionBase):
                                         client_all_added = True
                                     elif not sim_external_node_one_container:
                                         if connection["peer_name"] in hostvars:
+                                            if "kind" in hostvars[eth["peer"]] and "image" in hostvars[eth["peer"]]:
+                                                node_type = {"kind": hostvars[eth["peer"]]["kind"], "image":hostvars[eth["peer"]]["image"]}
                                             ext_nodes.append({eth["peer"]:node_type})
 
         # Additional containerlab mgmt connection defined in vars of SIMULATION Host                         
