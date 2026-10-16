@@ -16,7 +16,10 @@ class ActionModule(ActionBase):
         return reversed_connection in connection_list
     
     def _eos_intf_to_clab(self, name: str) -> str:
-        return name.split(".")[0].replace("Ethernet", "eth").replace("/", "_")
+        parent_name = name.split(".", 1)[0].replace("/", "_")
+        if parent_name.lower().startswith("ethernet"):
+            return "eth" + parent_name[len("Ethernet"):]
+        return parent_name
     
     def unique(self, sequence):
         result = []
@@ -352,9 +355,9 @@ class ActionModule(ActionBase):
                                         if connection["peer_name"] in hostvars:
                                             for tmp_connection in ext_connections:
                                                 if (str(connection["peer_int"]).lower() == tmp_connection["peer_int"]) and (connection["peer_name"] == tmp_connection["peer_name"]):
-                                                    connection["peer_int"] = "eth"+str(int(connection["peer_int"].split("eth")[1]) + 1)
+                                                    connection["peer_int"] = "eth"+str(int(connection["peer_int"].split(".")[0].replace("Ethernet","eth").replace("ethernet","eth").split("eth")[1]) + 1)
                                                 else:
-                                                    connection["peer_int"] = str(connection["peer_int"])
+                                                    connection["peer_int"] = self._eos_intf_to_clab(connection["peer_int"])
                                             
                                             connection["peer_int"] = str(connection["peer_int"].lower())
                                             ext_connections.append(connection)
