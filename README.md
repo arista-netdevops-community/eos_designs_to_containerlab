@@ -41,7 +41,7 @@ The following default variables are defined, and can be modified as desired:
             kind:'linux'
             image:'alpine:latest'
           others: 
-            kind: 'ceos'
+            kind: 'arista_ceos'
             image: 'ceos:4.31.1F'
 ```
 - `sim_ztp:` Enables ZTP support on ceos and veos nodes by setting the startup configuration to '/dev/null'. It also spawns two extra containers connected to the .253 and .254 for http and dhcp servers respectively.
