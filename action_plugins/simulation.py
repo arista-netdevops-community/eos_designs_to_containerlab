@@ -5,6 +5,7 @@ import os
 import netaddr
 import shutil
 import glob
+import re
 
 from string import Template
 from ansible.plugins.action import ActionBase
@@ -20,6 +21,51 @@ class ActionModule(ActionBase):
         if parent_name.lower().startswith("ethernet"):
             return "eth" + parent_name[len("Ethernet"):]
         return parent_name
+
+    def _add_external_links(self, connections, links, external_nodes):
+        """Add physical cables between already-discovered external nodes."""
+        if not isinstance(links, list):
+            raise AnsibleError("containerlab_external_links must be a list of endpoint pairs")
+        result = list(connections)
+        existing_links = set()
+        used_endpoints = set()
+        for connection in connections:
+            endpoints = (
+                (connection["loc_switch"], connection["loc_int"]),
+                (connection["peer_name"], connection["peer_int"]),
+            )
+            existing_links.add(frozenset(endpoints))
+            used_endpoints.update(endpoints)
+
+        for link in links:
+            values = link.get("endpoints") if isinstance(link, dict) else None
+            if not isinstance(values, list) or len(values) != 2:
+                raise AnsibleError("Each containerlab_external_links entry needs two endpoints")
+            endpoints = []
+            for value in values:
+                if not isinstance(value, str) or value.count(":") != 1:
+                    raise AnsibleError("External link endpoints must use node:interface format")
+                node, interface = value.split(":")
+                if node not in external_nodes:
+                    raise AnsibleError(f"External link node '{node}' is not a discovered external node")
+                if not re.fullmatch(r"[a-zA-Z0-9_-]+", interface):
+                    raise AnsibleError(f"External link '{value}' must use a physical containerlab interface, e.g. eth5")
+                endpoints.append((node, interface))
+            if endpoints[0][0] == endpoints[1][0]:
+                raise AnsibleError("External link endpoints must belong to different nodes")
+            key = frozenset(endpoints)
+            if key in existing_links:
+                continue
+            for node, interface in endpoints:
+                if (node, interface) in used_endpoints:
+                    raise AnsibleError(f"External link endpoint '{node}:{interface}' is already in use")
+            result.append({
+                "loc_switch": endpoints[0][0], "loc_int": endpoints[0][1],
+                "peer_name": endpoints[1][0], "peer_int": endpoints[1][1],
+            })
+            existing_links.add(key)
+            used_endpoints.update(endpoints)
+        return result
     
     def unique(self, sequence):
         result = []
@@ -253,6 +299,7 @@ class ActionModule(ActionBase):
             containerlab_mgmt_network = sv.get("containerlab_mgmt_network", None)
             containerlab_linux_kind_bind_dir = sv.get("containerlab_linux_kind_bind_dir", None)
             containerlab_add_mgmt_links = sv.get("containerlab_add_mgmt_links", [])
+            containerlab_external_links = sv.get("containerlab_external_links", [])
             containerlab_token_name = sv.get("containerlab_token_name", None)
             containerlab_deploy_local = sv.get("containerlab_deploy_local", False)
             containerlab_ceos_copy_to_flash = sv.get("containerlab_ceos_copy_to_flash", False)
@@ -439,6 +486,20 @@ class ActionModule(ActionBase):
 
         else:
             modified_connections = connections
+
+        if containerlab_external_links and (
+            sim_env != "clab" or not sim_include_avd_external_nodes or sim_external_node_one_container
+        ):
+            raise AnsibleError(
+                "containerlab_external_links requires sim_env: clab, "
+                "sim_include_avd_external_nodes: true and sim_external_node_one_container: false"
+            )
+        external_nodes = {
+            node for nodes in distributed_nodes.values() for node in nodes if node not in inventory
+        }
+        modified_connections = self._add_external_links(
+            modified_connections, containerlab_external_links, external_nodes
+        )
         
         vxlan_count = containerlab_vxlan_base
         for sim_node in all_sim_nodes:
