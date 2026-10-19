@@ -41,7 +41,7 @@ The following default variables are defined, and can be modified as desired:
             kind:'linux'
             image:'alpine:latest'
           others: 
-            kind: 'arista_ceos'
+            kind: 'ceos'
             image: 'ceos:4.31.1F'
 ```
 - `sim_ztp:` Enables ZTP support on ceos and veos nodes by setting the startup configuration to '/dev/null'. It also spawns two extra containers connected to the .253 and .254 for http and dhcp servers respectively.
@@ -84,6 +84,13 @@ subnet 172.16.1.0 netmask 255.255.255.0 {
 - `containerlab_endpoint_bind_dir:` In case the connected endpoints are of the kind 'linux' you can map a directory to an endpoint if needed. (default: None)
 - `containerlab_deploy_local:` Is meant if the lab is run on localhost and ssh is not to be use (ansible_connection: local). It directly uses the simulation directory within the intended directory from AVD. (default: False)
 - `containerlab_ceos_copy_to_flash:` If you are using a MAC with an ARM chip and Docker Desktop there might be an issue with using 'binds:' in containerlab. When this option is enabled instead of the 'binds:' option the 'ceos-copy-to-flash' is used. (default: False)
+- `containerlab_external_links`: Additional physical links between external nodes already discovered through AVD interface metadata. Define this on the SIMULATION group, using physical containerlab interface names. Requires `sim_env: clab`, `sim_include_avd_external_nodes: true` and `sim_external_node_one_container: false`. Duplicate cables are ignored; unknown nodes and reused endpoints cause an error. (default: `[]`)
+
+  ```yaml
+  containerlab_external_links:
+    # Cisco IOL Ethernet1/1 maps to eth5; Ethernet0/0 is management eth0.
+    - endpoints: ["old-core1:eth5", "old-core2:eth5"]
+  ```
 
 
 The above mentioned variables can be defined in the inventory file as shown below in the example playbook section.
