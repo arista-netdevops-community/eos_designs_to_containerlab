@@ -1,0 +1,48 @@
+---
+# Included once per SIMULATION host before rendering any topology files.
+- name: Resolve Containerlab version on the simulation host
+  delegate_to: "{{ containerlab_simulation_host }}"
+  any_errors_fatal: true
+  vars:
+    ansible_connection: >-
+      {{ 'local' if hostvars[containerlab_simulation_host].containerlab_deploy_local | default(false) | bool
+         else hostvars[containerlab_simulation_host].ansible_connection | default('ssh') }}
+    containerlab_target_mode: "{{ hostvars[containerlab_simulation_host].containerlab_mode | default('installed') }}"
+    containerlab_target_version: "{{ hostvars[containerlab_simulation_host].containerlab_version | default('', true) }}"
+  block:
+    - name: Validate Containerlab execution mode
+      ansible.builtin.assert:
+        that:
+          - containerlab_target_mode in ['installed', 'container']
+        fail_msg: "containerlab_mode must be installed or container"
+
+    - name: Read the version of the Containerlab executable used for deployment
+      ansible.builtin.command:
+        argv: >-
+          {{ ['clab', 'version', '--short'] if containerlab_target_mode == 'installed'
+             else ['docker', 'run', '--rm',
+                   hostvars[containerlab_simulation_host].containerlab_image | default('ghcr.io/srl-labs/clab'),
+                   'clab', 'version', '--short'] }}
+      become: "{{ hostvars[containerlab_simulation_host].ansible_become | default(containerlab_target_mode == 'container') }}"
+      register: containerlab_version_command
+      changed_when: false
+      check_mode: false
+      when: containerlab_target_version | string | trim | length == 0
+
+    - name: Store Containerlab version on the simulation host
+      ansible.builtin.set_fact:
+        containerlab_detected_version: >-
+          {{ containerlab_target_version | string | trim
+             if containerlab_target_version | string | trim | length > 0
+             else containerlab_version_command.stdout | trim }}
+      delegate_facts: true
+
+    - name: Validate the resolved Containerlab version
+      ansible.builtin.assert:
+        that:
+          - >-
+            hostvars[containerlab_simulation_host].containerlab_detected_version
+            is match('^v?[0-9]+\.[0-9]+(\.[0-9]+)?([-+][0-9A-Za-z.-]+)?$')
+        fail_msg: >-
+          Could not determine the Containerlab version for {{ containerlab_simulation_host }}.
+          Set containerlab_version to a quoted version such as "0.81.0" on this SIMULATION host.

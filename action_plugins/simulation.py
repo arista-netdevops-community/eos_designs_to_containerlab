@@ -12,6 +12,17 @@ from ansible.plugins.action import ActionBase
 from ansible.errors import AnsibleError
 
 class ActionModule(ActionBase):
+    def _uses_node_copy_to_flash(self, version, simulation_host):
+        """Select the node-level key introduced when extras was removed in 0.81."""
+        match = re.fullmatch(r"v?(\d+)\.(\d+)(?:\.(\d+))?(?:[-+][0-9A-Za-z.-]+)?", str(version).strip())
+        if match is None:
+            raise AnsibleError(
+                f"Containerlab version for '{simulation_host}' is missing or invalid. "
+                "Run create_avd_node_files to detect it, or set containerlab_version "
+                'to a quoted version such as "0.81.0" on this SIMULATION host.'
+            )
+        return tuple(int(part or 0) for part in match.groups()) >= (0, 81, 0)
+
     def _is_reverse_connection_present(self, connection_list, connection) -> bool:
         reversed_connection = {"loc_switch":connection["peer_name"], "loc_int":connection["peer_int"], "peer_name":connection["loc_switch"], "peer_int":connection["loc_int"]}
         return reversed_connection in connection_list
@@ -92,12 +103,19 @@ class ActionModule(ActionBase):
         
         
     def create_clab_topology_nodes(self, distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches, containerlab_custom_interface_mapping,
-                             containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, containerlab_set_platform, inventory, sim_ztp, sim_ztp_folder, containerlab_token_name, containerlab_ceos_copy_to_flash, sim_dir) -> dict:
+                             containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, containerlab_set_platform, inventory, sim_ztp, sim_ztp_folder, containerlab_token_name, containerlab_ceos_copy_to_flash, sim_dir,
+                             containerlab_versions=None) -> dict:
         nodes_dict = {}
         # Create the nodes for Clab topology file
         for distributed_node in distributed_nodes:  
             batch_count = 0 
             node_string = ""
+            if containerlab_ceos_copy_to_flash:
+                node_copy_to_flash = self._uses_node_copy_to_flash(
+                    (containerlab_versions or {}).get(distributed_node), distributed_node
+                )
+                flash_header = "      copy-to-flash:\n" if node_copy_to_flash else "      extras:\n        ceos-copy-to-flash:\n"
+                flash_item_prefix = "        - " if node_copy_to_flash else "          - "
             
             for node, kind_image in distributed_nodes[distributed_node].items():
                 kind = kind_image["kind"]
@@ -144,14 +162,13 @@ class ActionModule(ActionBase):
                     
                     if (kind in ["ceos", "veos", "arista_ceos", "arista_veos"]) and (containerlab_custom_interface_mapping or (containerlab_onboard_to_cvp_token is not None) or containerlab_serial_sysmac):
                         if containerlab_ceos_copy_to_flash:
-                            node_string += "      extras:\n"
-                            node_string += "        ceos-copy-to-flash:\n"
+                            node_string += flash_header
                         else:
                             node_string += "      binds:\n"
                         
                     if containerlab_custom_interface_mapping and node in inventory:
                         if containerlab_ceos_copy_to_flash:
-                            node_string += "          - "+distributed_node+"_mappings/"+node+"/EosIntfMapping.json\n"
+                            node_string += flash_item_prefix+distributed_node+"_mappings/"+node+"/EosIntfMapping.json\n"
                         else:
                             node_string += "        - "+distributed_node+"_mappings/"+node+".json:/mnt/flash/EosIntfMapping.json:ro\n"
                     if containerlab_onboard_to_cvp_token is not None and not node_sim_ztp:                                    
@@ -161,7 +178,7 @@ class ActionModule(ActionBase):
                                 cvp_token_filename = sim_dir+distributed_node+"_mappings/"+node+"/"+containerlab_token_name
                                 with open(cvp_token_filename, "w") as fh:
                                     fh.write(str(containerlab_onboard_to_cvp_token))
-                                node_string += "          - "+distributed_node+"_mappings/"+node+"/"+containerlab_token_name+"\n"
+                                node_string += flash_item_prefix+distributed_node+"_mappings/"+node+"/"+containerlab_token_name+"\n"
                             else:
                                 node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/"+containerlab_token_name+":ro\n"
                         else:
@@ -172,7 +189,7 @@ class ActionModule(ActionBase):
                                     cvp_token_filename = sim_dir+distributed_node+"_mappings/"+node+"/"+containerlab_token_name
                                     with open(cvp_token_filename, "w") as fh:
                                         fh.write(str(containerlab_onboard_to_cvp_token))
-                                    node_string += "          - "+distributed_node+"_mappings/"+node+"/"+containerlab_token_name+"\n"
+                                    node_string += flash_item_prefix+distributed_node+"_mappings/"+node+"/"+containerlab_token_name+"\n"
                                 else:
                                     node_string += "        - "+distributed_node+"_containerlab_onboarding_token:/mnt/flash/"+containerlab_token_name+":ro\n"
                     if "containerlab" in hostvars[node]:
@@ -182,13 +199,13 @@ class ActionModule(ActionBase):
                     if containerlab_serial_sysmac:
                         if "serial_number" in hostvars[node] or ("metadata" in hostvars[node] and "serial_number" in hostvars[node]["metadata"]) or ("metadata" in hostvars[node] and "system_mac_address" in hostvars[node]["metadata"]):
                             if containerlab_ceos_copy_to_flash:
-                                node_string += "          - "+distributed_node+"_mappings/"+node+"/ceos-config\n"
+                                node_string += flash_item_prefix+distributed_node+"_mappings/"+node+"/ceos-config\n"
                             else:
                                 node_string += "        - "+distributed_node+"_mappings/"+node+"_ceos_config:/mnt/flash/ceos-config:ro\n"
                     if containerlab_set_platform:
                         if "platform" in hostvars[node] or ("metadata" in hostvars[node] and "platform" in hostvars[node]["metadata"]):
                             if containerlab_ceos_copy_to_flash:
-                                node_string += "          - "+distributed_node+"_mappings/"+node+"/"+node+"-platform\n"
+                                node_string += flash_item_prefix+distributed_node+"_mappings/"+node+"/"+node+"-platform\n"
                             else:
                                 node_string += "        - "+distributed_node+"_mappings/"+node+"-platform:/mnt/flash/"+node+"-platform:ro\n"
                             node_string += "      exec:\n"
@@ -308,6 +325,14 @@ class ActionModule(ActionBase):
         # If sim_env not clab only one simulation node is possible, ex. for ACT. The first node will be choosen
         if sim_env != "clab":
             all_sim_nodes = [first_sim_node]
+
+        containerlab_versions = {}
+        if sim_env == "clab" and containerlab_ceos_copy_to_flash:
+            for sim_node in all_sim_nodes:
+                sim_hostvars = hostvars[sim_node]
+                version = sim_hostvars.get("containerlab_version") or sim_hostvars.get("containerlab_detected_version")
+                self._uses_node_copy_to_flash(version, sim_node)
+                containerlab_versions[sim_node] = version
         
         
         avd_connections = []
@@ -568,7 +593,8 @@ class ActionModule(ActionBase):
         links_dict = {}
         if sim_env == "clab":
             nodes_dict = self.create_clab_topology_nodes(distributed_nodes, hostvars, containerlab_enforce_startup_config, containerlab_deploy_startup_batches, containerlab_custom_interface_mapping,
-                             containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, containerlab_set_platform, inventory, sim_ztp, sim_ztp_folder, containerlab_token_name, containerlab_ceos_copy_to_flash, sim_dir)
+                             containerlab_onboard_to_cvp_token, containerlab_serial_sysmac, containerlab_set_platform, inventory, sim_ztp, sim_ztp_folder, containerlab_token_name, containerlab_ceos_copy_to_flash, sim_dir,
+                             containerlab_versions=containerlab_versions)
             links_dict = self.create_clab_topology_links(sim_connections)
              
             

@@ -1,4 +1,4 @@
-"""Regression tests for physical link discovery and explicit external cables."""
+"""Regression tests for link discovery and version-dependent topology output."""
 
 import importlib.util
 import json
@@ -33,7 +33,8 @@ class SimulationLinksTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertEqual(action._eos_intf_to_clab(name), expected)
 
-    def render_topology(self, directory, mapping, same_number=True, parents=True, one_container=False, external_links=None):
+    def render_topology(self, directory, mapping, same_number=True, parents=True, one_container=False, external_links=None,
+                        copy_to_flash=False, version=None, detected_version=None):
         directory = Path(directory)
         hostvars = {
             "CL_1": {
@@ -45,6 +46,9 @@ class SimulationLinksTests(unittest.TestCase):
                 "containerlab_custom_interface_mapping_same_number": same_number,
                 "sim_external_node_one_container": one_container,
                 "containerlab_external_links": external_links if external_links is not None else [],
+                "containerlab_ceos_copy_to_flash": copy_to_flash,
+                "containerlab_version": version,
+                "containerlab_detected_version": detected_version,
             },
             "old-core1": {},
             "old-core2": {},
@@ -157,6 +161,96 @@ class SimulationLinksTests(unittest.TestCase):
                 self.render_topology(directory, mapping=True, one_container=True, external_links=[
                     {"endpoints": ["old-core1:eth5", "old-core2:eth5"]},
                 ])
+
+    def test_topology_uses_the_deployment_hosts_version(self):
+        for version, detected_version, modern in (
+            ("0.80.0", None, False),
+            (None, "0.81.0", True),
+            ("0.80.0", "0.81.0", False),
+            ("0.100.0", None, True),
+        ):
+            with self.subTest(version=version, detected=detected_version), tempfile.TemporaryDirectory() as directory:
+                topology = self.render_topology(directory, mapping=True, copy_to_flash=True,
+                                                version=version, detected_version=detected_version)
+                for leaf in ("leaf1a", "leaf1b"):
+                    node = topology["nodes"][leaf]
+                    if modern:
+                        self.assertNotIn("extras", node)
+                        paths = node["copy-to-flash"]
+                    else:
+                        self.assertNotIn("copy-to-flash", node)
+                        paths = node["extras"]["ceos-copy-to-flash"]
+                    self.assertEqual(paths, [f"CL_1_mappings/{leaf}/EosIntfMapping.json"])
+
+    def test_missing_or_invalid_versions_fail_before_writing_topology(self):
+        for version in (None, "latest", "not-a-version"):
+            with self.subTest(version=version), tempfile.TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(AnsibleError, "containerlab_version"):
+                    self.render_topology(directory, mapping=True, copy_to_flash=True, version=version)
+                self.assertFalse((Path(directory) / "CL_1_topology.clab.yml").exists())
+
+
+class CopyToFlashTests(unittest.TestCase):
+    def render_nodes(self, directory, versions, copy=True, explicit_token_name=True):
+        action = SIMULATION.ActionModule.__new__(SIMULATION.ActionModule)
+        nodes = {}
+        hostvars = {}
+        for index, sim_host in enumerate(versions):
+            node = f"ceos{index}"
+            nodes[sim_host] = {node: {"kind": "arista_ceos", "image": "ceos:latest"}}
+            hostvars[node] = {
+                "metadata": {"serial_number": "TESTSERIAL", "platform": "cEOS"},
+                "daemon_terminattr": {"cvauth": {"token_file": "/mnt/flash/onboarding-token"}},
+                "containerlab": {"bind": "local-data:/data:ro"},
+            }
+        result = action.create_clab_topology_nodes(
+            nodes, hostvars, True, 20, True, "test-token", True, True,
+            list(hostvars), False, "", "onboarding-token" if explicit_token_name else None,
+            copy, str(directory) + "/", containerlab_versions=versions,
+        )
+        return {host: yaml.safe_load(content) for host, content in result.items()}
+
+    def test_all_flash_artifacts_and_custom_binds_work_on_mixed_versions(self):
+        for explicit_token_name in (True, False):
+            with self.subTest(explicit_token_name=explicit_token_name), tempfile.TemporaryDirectory() as directory:
+                result = self.render_nodes(directory, {"old": "0.80.2", "new": "v0.81.1"},
+                                           explicit_token_name=explicit_token_name)
+                for index, sim_host in enumerate(("old", "new")):
+                    node_name = f"ceos{index}"
+                    node = result[sim_host][node_name]
+                    if sim_host == "old":
+                        self.assertNotIn("copy-to-flash", node)
+                        paths = node["extras"]["ceos-copy-to-flash"]
+                    else:
+                        self.assertNotIn("extras", node)
+                        paths = node["copy-to-flash"]
+                    prefix = f"{sim_host}_mappings/{node_name}"
+                    self.assertEqual(paths, [
+                        f"{prefix}/EosIntfMapping.json",
+                        f"{prefix}/onboarding-token",
+                        f"{prefix}/ceos-config",
+                        f"{prefix}/{node_name}-platform",
+                    ])
+                    self.assertEqual(node["binds"], ["local-data:/data:ro"])
+                    self.assertEqual((Path(directory) / prefix / "onboarding-token").read_text(), "test-token")
+
+    def test_bind_mounts_do_not_require_a_version(self):
+        with tempfile.TemporaryDirectory() as directory:
+            node = self.render_nodes(directory, {"CL_1": None}, copy=False)["CL_1"]["ceos0"]
+            self.assertNotIn("copy-to-flash", node)
+            self.assertNotIn("extras", node)
+            self.assertIn("CL_1_mappings/ceos0.json:/mnt/flash/EosIntfMapping.json:ro", node["binds"])
+            self.assertIn("local-data:/data:ro", node["binds"])
+
+    def test_semantic_version_boundaries(self):
+        action = SIMULATION.ActionModule.__new__(SIMULATION.ActionModule)
+        for version, expected in (
+            ("0.9.0", False), ("0.80.99", False), ("0.81", True),
+            ("0.81.0", True), ("v0.81.1", True), ("0.81.0-rc1", True),
+            ("0.100.0+build.1", True), ("1.0.0", True),
+        ):
+            with self.subTest(version=version):
+                self.assertEqual(action._uses_node_copy_to_flash(version, "CL_1"), expected)
 
 
 if __name__ == "__main__":

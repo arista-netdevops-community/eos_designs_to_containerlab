@@ -1,6 +1,16 @@
 ---
 # tasks file for avd nodes
 
+- name: Detect Containerlab versions before generating topology files
+  ansible.builtin.include_tasks: detect_version.yml
+  loop: "{{ groups['SIMULATION'] | default([]) }}"
+  loop_control:
+    loop_var: containerlab_simulation_host
+  run_once: true
+  when:
+    - hostvars[containerlab_simulation_host].sim_env | default('clab') == 'clab'
+    - hostvars[containerlab_simulation_host].containerlab_ceos_copy_to_flash | default(false) | bool
+
 - name: Remove local containerlab output directories
   ansible.builtin.file:
     path: "{{ item }}"
