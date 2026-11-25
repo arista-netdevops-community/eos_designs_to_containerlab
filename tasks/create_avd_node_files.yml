@@ -1,22 +1,30 @@
 ---
 # tasks file for avd nodes
 
+- name: Detect Containerlab versions before generating topology files
+  ansible.builtin.include_tasks: detect_version.yml
+  loop: "{{ groups['SIMULATION'] | default([]) }}"
+  loop_control:
+    loop_var: containerlab_simulation_host
+  run_once: true
+  when:
+    - hostvars[containerlab_simulation_host].sim_env | default('clab') == 'clab'
+    - hostvars[containerlab_simulation_host].containerlab_ceos_copy_to_flash | default(false) | bool
+
 - name: Remove local containerlab output directories
-  ansible.builtin.file:
+  file:
     path: "{{ item }}"
     state: absent
   loop:
     - "{{ containerlab_dir }}"
   delegate_to: localhost
   run_once: true
-  # For a local deployment we need to retain to destroy the lab later
-  when: not (containerlab_deploy_local | default(false))
 
 - name: Include device intended structure configuration variables
   delegate_to: localhost
   include_vars:
     file: "{{ filename }}"
-  when: lookup('first_found', filename, skip=True) | length > 0
+  when: structured_config is not defined and lookup('first_found', filename, skip=True) | length > 0
   vars:
     filename: "{{ structured_dir }}/{{ inventory_hostname }}.yml"
 
