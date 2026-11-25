@@ -30,6 +30,14 @@ The following default variables are defined, and can be modified as desired:
 - `sim_ceos_version`: Name of the cEOS-lab docker image to be used. (default: ceos:latest)
 - `sim_topology_file_name`: Filename which will be used for the containerlab topology. (default: topology)
 - `sim_include_avd_external_nodes`: Whether to add nodes that are not defined in the AVD fabric, ex L3 peers, server and other connected endpoints. (default: false)
+- `containerlab_external_links`: Additional physical links between external nodes already discovered through AVD interface metadata. Define this on the SIMULATION group, using physical containerlab interface names. Requires `sim_env: clab`, `sim_include_avd_external_nodes: true` and `sim_external_node_one_container: false`. Duplicate cables are ignored; unknown nodes and reused endpoints cause an error. (default: `[]`)
+
+  ```yaml
+  containerlab_external_links:
+    # Cisco IOL Ethernet1/1 maps to eth5; Ethernet0/0 is management eth0.
+    - endpoints: ["old-core1:eth5", "old-core2:eth5"]
+  ```
+
 - `sim_external_node_one_container`: Whether to simulate all external nodes with one ceos. (default: false)
   NOTE: If this is set to 'true' the 'sim_external_nodes_map' is ignored.
   NOTE: This should only be used with EOS >= 4.31.0F where you can change the MAC addresses for each interface.
@@ -41,7 +49,7 @@ The following default variables are defined, and can be modified as desired:
             kind:'linux'
             image:'alpine:latest'
           others: 
-            kind: 'arista_ceos'
+            kind: 'ceos'
             image: 'ceos:4.31.1F'
 ```
 - `sim_ztp:` Enables ZTP support on ceos and veos nodes by setting the startup configuration to '/dev/null'. It also spawns two extra containers connected to the .253 and .254 for http and dhcp servers respectively.
@@ -73,6 +81,8 @@ subnet 172.16.1.0 netmask 255.255.255.0 {
 - `containerlab_vxlan_base`: Base VXLAN VNI for the communication between containers on different containerlab hosts. (default: 100)
 - `containerlab_enforce_startup_config`: Enforce to reset the startup-config for every run, see: https://containerlab.dev/manual/nodes/#enforce-startup-config . (default: true)
 - `containerlab_mode`: Deploy the topology using an installed or containerized containerlab. (default: installed ; options: installed | container)
+- `containerlab_image`: Containerlab image used for version detection and all containerized deployment commands. Define it on `SIMULATION`, optionally with a pinned tag such as `ghcr.io/srl-labs/clab:0.81.0`. (default: `ghcr.io/srl-labs/clab`)
+- `containerlab_version`: Optional version override on a `SIMULATION` host or group, for example `"0.81.0"`. When omitted and flash-copy is enabled, the role detects the version on each simulation host before generating files. Useful for offline topology generation; quote the value to preserve its version components.
 - `containerlab_runtime`: Optional containerlab runtime backend. When set to 'podman', containerlab will use Podman instead of Docker as the container runtime. Only adds --runtime flag when defined and not 'docker'. (default: undefined, uses containerlab default which is Docker)
 - `containerlab_timeout`: The timeout of API requests that containerlab send toward external resources (i.e. docker). (default: 120s)
 - `containerlab_skip_post_deploy`: Skip containerlab post deploy actions. Supported in containerlab version 0.24 and later. (default: false)
@@ -83,17 +93,56 @@ subnet 172.16.1.0 netmask 255.255.255.0 {
 - `containerlab_deploy_startup_batches:` Depending on your containerlab host resources you might want to limit the amount of containers started in parallel. This option uses the containerlab option startup-delay and the delay is set to 300 seconds between the batches. (default: 20)
 - `containerlab_endpoint_bind_dir:` In case the connected endpoints are of the kind 'linux' you can map a directory to an endpoint if needed. (default: None)
 - `containerlab_deploy_local:` Is meant if the lab is run on localhost and ssh is not to be use (ansible_connection: local). It directly uses the simulation directory within the intended directory from AVD. (default: False)
-- `containerlab_ceos_copy_to_flash:` If you are using a MAC with an ARM chip and Docker Desktop there might be an issue with using 'binds:' in containerlab. When this option is enabled instead of the 'binds:' option the 'ceos-copy-to-flash' is used. (default: False)
-- `containerlab_external_links`: Additional physical links between external nodes already discovered through AVD interface metadata. Define this on the SIMULATION group, using physical containerlab interface names. Requires `sim_env: clab`, `sim_include_avd_external_nodes: true` and `sim_external_node_one_container: false`. Duplicate cables are ignored; unknown nodes and reused endpoints cause an error. (default: `[]`)
-
-  ```yaml
-  containerlab_external_links:
-    # Cisco IOL Ethernet1/1 maps to eth5; Ethernet0/0 is management eth0.
-    - endpoints: ["old-core1:eth5", "old-core2:eth5"]
-  ```
+- `containerlab_ceos_copy_to_flash`: Copy cEOS flash files instead of bind-mounting them. Uses `extras.ceos-copy-to-flash` below Containerlab 0.81 and node-level `copy-to-flash` starting with 0.81. (default: false)
 
 
 The above mentioned variables can be defined in the inventory file as shown below in the example playbook section.
+
+### Containerlab version detection
+
+With `containerlab_ceos_copy_to_flash: true`, `create_avd_node_files` checks each
+`SIMULATION` host before removing existing output or writing a topology. It runs
+`clab version --short` on that host for `containerlab_mode: installed`, or
+`docker run --rm <containerlab_image> clab version --short` for `containerlab_mode: container`.
+For `containerlab_deploy_local: true` it uses a local connection. Detection runs
+in Ansible check mode too, and the version command reports no changes.
+
+SSH credentials must be available before this role runs. The project
+`playbooks/create-clab.yml` collects them in its first play and retains them as
+host facts with logging disabled. Custom playbooks can supply connection
+variables through inventory, SSH keys, or their own credential setup.
+
+The detected version is stored as `containerlab_detected_version` on the
+simulation host. Different simulation hosts can run versions on opposite sides
+of 0.81; each generated topology uses its host's format. An explicit
+`containerlab_version` takes precedence and skips the executable query:
+
+```yaml
+# group_vars/SIMULATION.yml, or host_vars/<simulation-host>.yml
+containerlab_ceos_copy_to_flash: true
+containerlab_version: "0.81.0"  # Optional: enables offline generation.
+```
+
+For versions below 0.81 the node contains:
+
+```yaml
+extras:
+  ceos-copy-to-flash:
+    - CL_1_mappings/leaf1/EosIntfMapping.json
+```
+
+Starting with 0.81 the same file is listed directly on the node:
+
+```yaml
+copy-to-flash:
+  - CL_1_mappings/leaf1/EosIntfMapping.json
+```
+
+The choice applies to interface mappings, onboarding tokens, ceos-config and
+platform files. Custom bind mounts remain under `binds`. Missing or invalid
+versions fail before topology generation; the role does not assume a legacy
+version. With flash-copy disabled, generation uses `binds` without a version query.
+See the [Containerlab 0.81 release notes](https://containerlab.dev/rn/0.81/).
 
 ### Additional containerlab variables for nodes
 
