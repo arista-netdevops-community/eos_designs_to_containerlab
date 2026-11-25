@@ -17,6 +17,10 @@ structured_dir: '{{ output_dir }}/{{ structured_dir_name }}'
 containerlab_dir_name: 'simulation'
 containerlab_dir: '{{ output_dir }}/{{ containerlab_dir_name }}'
 containerlab_mode: installed
+containerlab_image: ghcr.io/srl-labs/clab
+# Optional offline override, defined on SIMULATION hosts/group, e.g. "0.81.0".
+# Otherwise create_avd_node_files detects the deployment executable's version.
+# containerlab_version: "0.81.0"
 containerlab_labname: AVD
 containerlab_deploy_on_hosts: true
 containerlab_deploy_local: false
