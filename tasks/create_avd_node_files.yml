@@ -19,12 +19,14 @@
     - "{{ containerlab_dir }}"
   delegate_to: localhost
   run_once: true
+  # For a local deployment we need to retain to destroy the lab later
+  when: not (containerlab_deploy_local | default(false))
 
 - name: Include device intended structure configuration variables
   delegate_to: localhost
   include_vars:
     file: "{{ filename }}"
-  when: structured_config is not defined and lookup('first_found', filename, skip=True) | length > 0
+  when: lookup('first_found', filename, skip=True) | length > 0
   vars:
     filename: "{{ structured_dir }}/{{ inventory_hostname }}.yml"
 
