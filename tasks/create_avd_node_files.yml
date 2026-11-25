@@ -12,7 +12,7 @@
     - hostvars[containerlab_simulation_host].containerlab_ceos_copy_to_flash | default(false) | bool
 
 - name: Remove local containerlab output directories
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
