@@ -30,14 +30,6 @@ The following default variables are defined, and can be modified as desired:
 - `sim_ceos_version`: Name of the cEOS-lab docker image to be used. (default: ceos:latest)
 - `sim_topology_file_name`: Filename which will be used for the containerlab topology. (default: topology)
 - `sim_include_avd_external_nodes`: Whether to add nodes that are not defined in the AVD fabric, ex L3 peers, server and other connected endpoints. (default: false)
-- `containerlab_external_links`: Additional physical links between external nodes already discovered through AVD interface metadata. Define this on the SIMULATION group, using physical containerlab interface names. Requires `sim_env: clab`, `sim_include_avd_external_nodes: true` and `sim_external_node_one_container: false`. Duplicate cables are ignored; unknown nodes and reused endpoints cause an error. (default: `[]`)
-
-  ```yaml
-  containerlab_external_links:
-    # Cisco IOL Ethernet1/1 maps to eth5; Ethernet0/0 is management eth0.
-    - endpoints: ["old-core1:eth5", "old-core2:eth5"]
-  ```
-
 - `sim_external_node_one_container`: Whether to simulate all external nodes with one ceos. (default: false)
   NOTE: If this is set to 'true' the 'sim_external_nodes_map' is ignored.
   NOTE: This should only be used with EOS >= 4.31.0F where you can change the MAC addresses for each interface.
@@ -49,7 +41,7 @@ The following default variables are defined, and can be modified as desired:
             kind:'linux'
             image:'alpine:latest'
           others: 
-            kind: 'ceos'
+            kind: 'arista_ceos'
             image: 'ceos:4.31.1F'
 ```
 - `sim_ztp:` Enables ZTP support on ceos and veos nodes by setting the startup configuration to '/dev/null'. It also spawns two extra containers connected to the .253 and .254 for http and dhcp servers respectively.
@@ -93,6 +85,14 @@ subnet 172.16.1.0 netmask 255.255.255.0 {
 - `containerlab_deploy_startup_batches:` Depending on your containerlab host resources you might want to limit the amount of containers started in parallel. This option uses the containerlab option startup-delay and the delay is set to 300 seconds between the batches. (default: 20)
 - `containerlab_endpoint_bind_dir:` In case the connected endpoints are of the kind 'linux' you can map a directory to an endpoint if needed. (default: None)
 - `containerlab_deploy_local:` Is meant if the lab is run on localhost and ssh is not to be use (ansible_connection: local). It directly uses the simulation directory within the intended directory from AVD. (default: False)
+- `containerlab_external_links`: Additional physical links between external nodes already discovered through AVD interface metadata. Define this on the SIMULATION group, using physical containerlab interface names. Requires `sim_env: clab`, `sim_include_avd_external_nodes: true` and `sim_external_node_one_container: false`. Duplicate cables are ignored; unknown nodes and reused endpoints cause an error. (default: `[]`)
+
+  ```yaml
+  containerlab_external_links:
+    # Cisco IOL Ethernet1/1 maps to eth5; Ethernet0/0 is management eth0.
+    - endpoints: ["old-core1:eth5", "old-core2:eth5"]
+  ```
+
 - `containerlab_ceos_copy_to_flash`: Copy cEOS flash files instead of bind-mounting them. Uses `extras.ceos-copy-to-flash` below Containerlab 0.81 and node-level `copy-to-flash` starting with 0.81. (default: false)
 
 
